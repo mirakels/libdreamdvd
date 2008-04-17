@@ -828,7 +828,7 @@ send_message:
 							}
 						}
 					}
-					if ((buf[14+3])==0xC0+audio_id) // mpeg audio
+					else if ((buf[14+3])==0xC0+audio_id) // mpeg audio
 					{
 						if (audio_type != DDVD_MPEG)
 						{
@@ -851,7 +851,7 @@ send_message:
 
 						write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
 					}
-					if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0xA0+audio_id) // lpcm audio
+					else if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0xA0+audio_id) // lpcm audio
 					{
 						if (audio_type != DDVD_LPCM)
 						{
@@ -920,7 +920,7 @@ send_message:
 
 						//write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
 					}
-					if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0x88+audio_id) // dts audio
+					else if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0x88+audio_id) // dts audio
 					{
 						if (audio_type != DDVD_DTS)
 						{
@@ -943,7 +943,7 @@ send_message:
 						
 						write(ddvd_ac3_fd, buf+14, buf[19]+(buf[18]<<8)+6); // not working yet ....
 					}
-					if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0x80+audio_id) // ac3 audio
+					else if ((buf[14+3])==0xBD && (buf[14+buf[14+8]+9])==0x80+audio_id) // ac3 audio
 					{
 						if (audio_type != DDVD_AC3)
 						{
@@ -1024,7 +1024,7 @@ send_message:
 							
 						}
 					}
-					if ( (buf[14+3])==0xBD && ((buf[14+buf[14+8]+9])&0xE0) == 0x20 &&  ((buf[14+buf[14+8]+9])&0x1F) == spu_active_id ) // SPU packet
+					else if ( (buf[14+3])==0xBD && ((buf[14+buf[14+8]+9])&0xE0) == 0x20 &&  ((buf[14+buf[14+8]+9])&0x1F) == spu_active_id ) // SPU packet
 					{
 						memcpy(spu_buffer+ddvd_spu_ptr,buf+buf[22]+14+10,2048-(buf[22]+14+10));
 						ddvd_spu_ptr+=2048-(buf[22]+14+10);
