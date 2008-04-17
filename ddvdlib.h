@@ -253,6 +253,3 @@ struct ddvd_time {
 	int end_chapter;
 	int end_title;
 };
-
-void debug_send_key(struct ddvd *pconfig, int key, const char *file, int line);
-#define DDVD_SEND_KEY(instance, key) debug_send_key(instance, key, __FILE__, __LINE__)

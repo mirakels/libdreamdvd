@@ -131,12 +131,6 @@ void ddvd_send_key(struct ddvd *pconfig, int key)
 	write(pconfig->key_pipe[1], &key, sizeof(int));
 }
 
-void debug_send_key(struct ddvd *pconfig, int key, const char *file, int line)
-{
-	printf("ddvd_send_key %d at line %d in file %s\n", key, line, file);
-	ddvd_send_key(pconfig, key);
-}
-
 // skip n seconds in playing n>0 forward - n<0 backward
 
 void ddvd_skip_seconds(struct ddvd *pconfig, int seconds)
@@ -153,15 +147,15 @@ void ddvd_skip_seconds(struct ddvd *pconfig, int seconds)
 // jump to beginning of given title
 void ddvd_set_title(struct ddvd *pconfig, int title)
 {
-	DDVD_SEND_KEY(pconfig, DDVD_SET_TITLE);
-	DDVD_SEND_KEY(pconfig, title);
+	ddvd_send_key(pconfig, DDVD_SET_TITLE);
+	ddvd_send_key(pconfig, title);
 }
 
 // jump to beginning of given chapter
 void ddvd_set_chapter(struct ddvd *pconfig, int chapter)
 {
-	DDVD_SEND_KEY(pconfig, DDVD_SET_CHAPTER);
-	DDVD_SEND_KEY(pconfig, chapter);
+	ddvd_send_key(pconfig, DDVD_SET_CHAPTER);
+	ddvd_send_key(pconfig, chapter);
 }
 
 // get and process the next message from the main player
