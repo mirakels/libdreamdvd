@@ -1730,8 +1730,8 @@ key_play:
 						printf("DDVD_SET_TITLE %d/%d\n",title, totalTitles);
 						if ( title <= totalTitles )
 						{
-							ddvd_play_empty(TRUE);
 							dvdnav_part_play(dvdnav, title, 0);
+							ddvd_play_empty(TRUE);
 							msg=DDVD_SHOWOSD_TIME;
 						}
 						break;
@@ -1745,8 +1745,8 @@ key_play:
 						printf("DDVD_SET_CHAPTER %d/%d in title %d\n",chapter, totalChapters, titleNo);
 						if ( chapter <= totalChapters )
 						{
-							ddvd_play_empty(TRUE);
 							dvdnav_part_play(dvdnav, titleNo, chapter);
+							ddvd_play_empty(TRUE);
 							msg=DDVD_SHOWOSD_TIME;
 						}
 						break;
