@@ -1460,52 +1460,6 @@ send_message:
 
 			switch (rccode) // actions inside and outside of menu
 			{
-				case DDVD_SET_TITLE:
-				{
-					int title, totalTitles;
-					playerconfig->in_menu=0;
-					ddvd_readpipe(key_pipe, &title, sizeof(int),1);
-					printf("DDVD_SET_TITLE %d\n",title);
-					dvdnav_get_number_of_titles(dvdnav, &totalTitles);
-					if ( title <= totalTitles )
-					{
-						if (in_menu)
-						{
-							playerconfig->in_menu=0;
-							dvdnav_reset(dvdnav);
-							dvdnav_title_play(dvdnav, title);
-						}
-						else
-						{
-							ddvd_play_empty(TRUE);
-							dvdnav_part_play(dvdnav, title, 1);
-						}
-						msg=DDVD_SHOWOSD_TIME;
-					}
-					break;
-				}
-				case DDVD_SET_CHAPTER:
-				{
-					int chapter, totalChapters, chapterNo, titleNo;
-					ddvd_readpipe(key_pipe, &chapter, sizeof(int),1);
-					printf("DDVD_SET_CHAPTER %d\n",chapter);
-					dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-					dvdnav_get_number_of_parts(dvdnav, titleNo, &totalChapters);
-					if ( chapter <= totalChapters )
-					{
-						if (in_menu)
-						{
-							playerconfig->in_menu=0;
-							dvdnav_reset(dvdnav);
-							dvdnav_title_play(dvdnav, titleNo);
-						}
-						else
-							ddvd_play_empty(TRUE);
-						dvdnav_part_play(dvdnav, titleNo, chapter);
-						msg=DDVD_SHOWOSD_TIME;
-					}
-					break;
-				}
 				case DDVD_SET_MUTE:
 					ismute=1;
 					break;
@@ -1534,18 +1488,16 @@ send_message:
 						dvdnav_right_button_select(dvdnav, pci);
 						break;
 					case DDVD_KEY_OK: //OK
-						{
-							ddvd_wait_for_user=0;
-							memset(p_lfb, 0, ddvd_screeninfo_stride*ddvd_screeninfo_yres); //clear screen ..
-							memset(ddvd_lbb, 0, ddvd_screeninfo_xres*ddvd_screeninfo_yres); //clear backbuffer
-							msg=DDVD_SCREEN_UPDATE;
-							write(message_pipe, &msg, sizeof(int));
-							ddvd_clear_buttons=1;
-							dvdnav_button_activate(dvdnav, pci);
-							ddvd_play_empty(TRUE);
-							if (ddvd_wait_timer_active)
-								ddvd_wait_timer_active=0;
-						}
+						ddvd_wait_for_user=0;
+						memset(p_lfb, 0, ddvd_screeninfo_stride*ddvd_screeninfo_yres); //clear screen ..
+						memset(ddvd_lbb, 0, ddvd_screeninfo_xres*ddvd_screeninfo_yres); //clear backbuffer
+						msg=DDVD_SCREEN_UPDATE;
+						write(message_pipe, &msg, sizeof(int));
+						ddvd_clear_buttons=1;
+						dvdnav_button_activate(dvdnav, pci);
+						ddvd_play_empty(TRUE);
+						if (ddvd_wait_timer_active)
+							ddvd_wait_timer_active=0;
 						break;
 					case DDVD_KEY_EXIT: //Exit
 						printf("DDVD_KEY_EXIT (menu)\n");
@@ -1561,6 +1513,8 @@ send_message:
 						break;
 					case DDVD_SKIP_FWD:
 					case DDVD_SKIP_BWD:
+					case DDVD_SET_TITLE:
+					case DDVD_SET_CHAPTER:
 						// we must empty the pipe here...
 						ddvd_readpipe(key_pipe, &keydone, sizeof(int),1);
 					default:
@@ -1764,6 +1718,35 @@ key_play:
 							}
 							dvdnav_sector_search(dvdnav, posneu2, SEEK_SET);
 							ddvd_lpcm_count=0;
+							msg=DDVD_SHOWOSD_TIME;
+						}
+						break;
+					}
+					case DDVD_SET_TITLE:
+					{
+						int title, totalTitles;
+						ddvd_readpipe(key_pipe, &title, sizeof(int),1);
+						dvdnav_get_number_of_titles(dvdnav, &totalTitles);
+						printf("DDVD_SET_TITLE %d/%d\n",title, totalTitles);
+						if ( title <= totalTitles )
+						{
+							ddvd_play_empty(TRUE);
+							dvdnav_part_play(dvdnav, title, 0);
+							msg=DDVD_SHOWOSD_TIME;
+						}
+						break;
+					}
+					case DDVD_SET_CHAPTER:
+					{
+						int chapter, totalChapters, chapterNo, titleNo;
+						ddvd_readpipe(key_pipe, &chapter, sizeof(int),1);
+						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
+						dvdnav_get_number_of_parts(dvdnav, titleNo, &totalChapters);
+						printf("DDVD_SET_CHAPTER %d/%d in title %d\n",chapter, totalChapters, titleNo);
+						if ( chapter <= totalChapters )
+						{
+							ddvd_play_empty(TRUE);
+							dvdnav_part_play(dvdnav, titleNo, chapter);
 							msg=DDVD_SHOWOSD_TIME;
 						}
 						break;
