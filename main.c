@@ -358,19 +358,10 @@ void ddvd_run(struct ddvd *playerconfig) {
 		while (i++<10) //that really sucks but there is no other way
 			write(ddvd_output_fd, ddvd_startup_logo, sizeof(ddvd_startup_logo));
 #else
-		unsigned char ifbuffer[sizeof(ddvd_startup_logo)*2+9];
-		ifbuffer[0]=0;
-		ifbuffer[1]=0;
-		ifbuffer[2]=1;
-		ifbuffer[3]=0xE0;
-		ifbuffer[4]=(sizeof(ddvd_startup_logo)*2)>>8;
-		ifbuffer[5]=(sizeof(ddvd_startup_logo)*2)&0xFF;
-		ifbuffer[6]=0x80;
-		ifbuffer[7]=0;
-		ifbuffer[8]=0;
-		memcpy(ifbuffer+9,ddvd_startup_logo,sizeof(ddvd_startup_logo));
-		memcpy(ifbuffer+9+sizeof(ddvd_startup_logo),ddvd_startup_logo,sizeof(ddvd_startup_logo));
-		write(ddvd_output_fd, ifbuffer, sizeof(ddvd_startup_logo)*2+9);
+		unsigned char pes_header[] = { 0x00, 0x00, 0x01, 0xE0, 0x00, 0x00, 0x80, 0x00, 0x00 };
+		write(ddvd_output_fd, pes_header, sizeof(pes_header));
+		write(ddvd_output_fd, ddvd_startup_logo, sizeof(ddvd_startup_logo));
+		write(ddvd_output_fd, ddvd_startup_logo, sizeof(ddvd_startup_logo));
 #endif
 #endif
 	
@@ -665,20 +656,8 @@ send_message:
 					while (i++<10) //that really sucks but there is no other way
 						write(ddvd_output_fd, last_iframe, ddvd_last_iframe_len);
 #else
-					unsigned char ifbuffer[ddvd_last_iframe_len*2+9];
-					ifbuffer[0]=0;
-					ifbuffer[1]=0;
-					ifbuffer[2]=1;
-					ifbuffer[3]=0xE0;
-					ifbuffer[4]=(ddvd_last_iframe_len*2)>>8;
-					ifbuffer[5]=(ddvd_last_iframe_len*2)&0xFF;
-					ifbuffer[6]=0x80;
-					ifbuffer[7]=0;
-					ifbuffer[8]=0;
-					memcpy(ifbuffer+9,last_iframe,ddvd_last_iframe_len);
-					memcpy(ifbuffer+9+ddvd_last_iframe_len,last_iframe,ddvd_last_iframe_len);
-					write(ddvd_output_fd, ifbuffer, ddvd_last_iframe_len*2+9);
-#endif					
+					write(ddvd_output_fd, last_iframe, ddvd_last_iframe_len);
+#endif
 					//printf("Show iframe with size: %d\n",ddvd_last_iframe_len);
 					ddvd_last_iframe_len=0;
 				}
