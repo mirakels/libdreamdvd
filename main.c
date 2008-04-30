@@ -29,6 +29,8 @@
 
 #include <poll.h>
 
+#define CONVERT_TO_DVB_COMPLIANT_AC3
+
 /*
  * external functions 
  */
@@ -415,7 +417,11 @@ void ddvd_run(struct ddvd *playerconfig) {
 	if (ac3thru)
 	{
 		ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1 );
-		ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3 );
+#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
+		ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0 );  // AC3 (dvb compliant)
+#else
+		ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3 );  // AC3 VOB
+#endif
 	}
 	else
 	{
@@ -927,10 +933,14 @@ send_message:
 						if (audio_type != DDVD_AC3)
 						{
 							//printf("Switch to AC3 Audio\n");
-							if (ac3thru)
+							if (ac3thru || !have_liba52) // !have_liba52 and !ac3thru should never happen, but who knows ;)
 							{
 								ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1 );
-								ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3 );
+#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
+								ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0 );  // AC3 (dvb compliant)
+#else
+								ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3 );  // AC3 VOB
+#endif
 							}
 							else
 							{
@@ -953,7 +963,17 @@ send_message:
 						
 						if (ac3thru || !have_liba52) // !have_liba52 and !ac3thru should never happen, but who knows ;)
 						{
+#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
+							unsigned short pes_len = (buf[14+4] << 8 | buf[14+5]);
+							pes_len -= 4; // strip first 4 bytes of pes payload
+							buf[14+4] = pes_len >> 8; // patch pes len
+							buf[15+4] = pes_len & 0xFF;
+
+							write(ddvd_ac3_fd, buf+14, 9+buf[14+8]); // write pes_header
+							write(ddvd_ac3_fd, buf+14+9+buf[14+8]+4, pes_len - (3+buf[14+8]) );  // write pes_payload
+#else
 							write(ddvd_ac3_fd, buf+14, buf[19]+(buf[18]<<8)+6);
+#endif
 							//fwrite(buf+buf[22]+27, 1, ((buf[18]<<8)|buf[19])-buf[22]-7, fac3); //debugwrite
 						}
 						else
