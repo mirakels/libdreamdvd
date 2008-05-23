@@ -1911,8 +1911,8 @@ int ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect)
 		else 
 		{
 			sprintf(aspect,"16:9");
-			sprintf(policy,"VIDEO_CENTER_CUT_OUT"); //no scaling neededVIDEO_CENTER_CUT_OUT
-			sprintf(policy2,"panscan");
+			sprintf(policy,"VIDEO_CENTER_CUT_OUT"); //no scaling needed
+			sprintf(policy2,"bestfit");
 			tv_scale=0; //off
 			saa=SAA_WSS_169F;
 			sprintf(saa2,"16:9_full_format");
