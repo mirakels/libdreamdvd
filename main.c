@@ -349,6 +349,7 @@ void ddvd_run(struct ddvd *playerconfig) {
 	ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_MEMORY );
 	ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER);
 	ioctl(ddvd_fdaudio, AUDIO_PLAY);
+	ioctl(ddvd_fdvideo, VIDEO_SET_STREAMTYPE, 0); // set mpeg2
 #else
 #error please define CONFIG_API_VERSION to be 1 or 3
 #endif
