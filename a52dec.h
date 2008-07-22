@@ -61,7 +61,7 @@ void *a52_handle;
 
 a52_state_t * state;
 
-int dvdd_ac3_decode(uint8_t *input, int len, int16_t *output);
+int ddvd_ac3_decode(const uint8_t *input, unsigned int len, int16_t *output);
 int ddvd_load_liba52();
 void ddvd_close_liba52();
 

@@ -80,7 +80,7 @@ static inline int16_t a52_convert (int32_t i)
 // liba52 gives us 256 samples left - 256 samples right
 // we need 1 left - 1 right so lets sort them
 
-void a52_convert2s16_2 (sample_t * _f, int16_t * s16)
+static void a52_convert2s16_2 (sample_t * _f, int16_t * s16)
 {
     int i;
     int32_t * f = (int32_t *) _f;
@@ -93,13 +93,13 @@ void a52_convert2s16_2 (sample_t * _f, int16_t * s16)
 
 // a52 decode function (needs liba52)
 
-int ddvd_ac3_decode(uint8_t *input, int len, int16_t *output)
+int ddvd_ac3_decode(const uint8_t *input, unsigned int len, int16_t *output)
 {
 	static int sample_rate;
     static int flags;
     int bit_rate;
 	int out_len=0;
-	uint8_t *end; 
+	const uint8_t *end; 
 	end=input+len;
 	
     static uint8_t buf[3840];
