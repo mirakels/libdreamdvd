@@ -80,7 +80,9 @@
 #define VIDEO_GET_PTS           _IOR('o', 1, unsigned int*)
 #endif
 #if CONFIG_API_VERSION == 3
+#ifndef VIDEO_GET_PTS
 #define VIDEO_GET_PTS              _IOR('o', 57, unsigned long long)
+#endif
 #endif
 
 #define CLAMP(x)     ((x < 0) ? 0 : ((x > 255) ? 255 : x))
@@ -156,14 +158,13 @@ struct ddvd {
 	int tv_system;					// 0-> PAL 1-> NTSC
 	int ac3thru;					// 0-> internal soft decoding 1-> ac3 pass thru to optical out
 	unsigned char *lfb;				// framebuffer to render subtitles and menus
-	int lfb_set;					// flag if framebuffer has been set
 	int xres;						// x resolution of the framebuffer (normally 720, we dont scale inside libdreamdvd)
 	int yres;						// y resolution of the framebuffer (normally 576, we dont scale inside libdreamdvd)
 	int stride;						// line_length of the framebuffer (normally 720*bypp, but not always like on DM7025)
 	int bypp;						// the bytes per pixel only 1 (8bit framebuffer) or 4 (32bit) are supported
 	int key_pipe[2];				// pipe for sending a command/remote control key (sizeof(int)) to the player
 	int message_pipe[2];			// pipe for getting player status, osd time and text as well as 8bit color tables
-	char dvd_path[256];				// the path of a dvd block device ("/dev/dvd"), an iso-file ("/hdd/dvd.iso")
+	char *dvd_path;				// the path of a dvd block device ("/dev/dvd"), an iso-file ("/hdd/dvd.iso")
 									// or a dvd file structure ("/hdd/dvd/mymovie") to play 
 	/* buffer for actual states */
 	char title_string[96];
@@ -181,17 +182,17 @@ struct ddvd {
 };
 
 /* internal functions */
-struct 		ddvd_time ddvd_get_osd_time();
-int 		ddvd_readpipe(int pipefd, void *dest, int bytes, int blocked_read);
-int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect);
-uint64_t 	ddvd_get_time(void);
-void 		ddvd_play_empty (int device_clear);
-void 		ddvd_device_clear (void);
-int 		ddvd_spu_decode_data( uint8_t * buffer, int len );
-void 		ddvd_blit_to_argb(void *_dst, void *_src, int pix);
+static struct 		ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig);
+static int 		ddvd_readpipe(int pipefd, void *dest, size_t bytes, int blocked_read);
+static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect);
+static uint64_t 	ddvd_get_time(void);
+static void 		ddvd_play_empty(int device_clear);
+static void 		ddvd_device_clear(void);
+static int 		ddvd_spu_decode_data(const uint8_t * buffer, int len);
+static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 #if CONFIG_API_VERSION == 3
-void 		ddvd_set_pcr_offset();
-void 		ddvd_unset_pcr_offset();
+static void 		ddvd_set_pcr_offset(void);
+static void 		ddvd_unset_pcr_offset(void);
 #endif
 
 #endif
