@@ -29,6 +29,16 @@
  */
 struct ddvd; 
 
+enum ddvd_result {
+	DDVD_OK = 0,
+	DDVD_INVAL,
+	DDVD_NOMEM,
+	DDVD_BUSY,
+	DDVD_FAIL_OPEN,
+	DDVD_FAIL_PREFS,
+	DDVD_FAIL_READ,
+	DDVD_RESULT_MAX,
+};
 
 /* 
  * functions for initialization and setting options DONT USE THIS FUNCTIONS AFTER STARTING WITH ddvd_run !!!
@@ -69,7 +79,7 @@ void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_system);
 
 // starting playback, this function should be started inside a thread, because it only comes back after
 // stopping the dvd player
-void ddvd_run(struct ddvd *pconfig);		
+enum ddvd_result ddvd_run(struct ddvd *pconfig);
 
 
 /* 

@@ -326,11 +326,11 @@ void ddvd_get_title_string(struct ddvd *pconfig, char *title_string)
 }
 
 // the main player loop
-void ddvd_run(struct ddvd *playerconfig)
+enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 {
 	if (playerconfig->lfb == NULL) {
 		printf("Frame/backbuffer not given to libdreamdvd. Will not start the player !\n");
-		return;
+		return DDVD_INVAL;
 	}
 
 	ddvd_screeninfo_xres = playerconfig->xres;
@@ -340,6 +340,7 @@ void ddvd_run(struct ddvd *playerconfig)
 	int message_pipe = playerconfig->message_pipe[1];
 	int key_pipe = playerconfig->key_pipe[0];
 	unsigned char *p_lfb = playerconfig->lfb;
+	enum ddvd_result res = DDVD_OK;
 	int msg;
 	// try to load liba52.so.0 for softdecoding
 	int have_liba52 = ddvd_load_liba52();
@@ -352,24 +353,28 @@ void ddvd_run(struct ddvd *playerconfig)
 	ddvd_lbb = malloc(720 * 576);	// the spu backbuffer is always max DVD PAL 720x576 pixel (NTSC 720x480)
 	if (ddvd_lbb == NULL) {
 		perror("SPU-Backbuffer <mem allocation failed>");
+		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
 
 	last_iframe = malloc(320 * 1024);
 	if (last_iframe == NULL) {
 		perror("malloc");
+		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
 
 	spu_buffer = malloc(2 * (128 * 1024));
 	if (spu_buffer == NULL) {
 		perror("malloc");
+		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
 
 	spu_backbuffer = malloc(3 * 2 * (128 * 1024));
 	if (spu_backbuffer == NULL) {
 		perror("malloc");
+		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
 
@@ -385,24 +390,28 @@ void ddvd_run(struct ddvd *playerconfig)
 	ddvd_output_fd = open("/dev/video", O_WRONLY);
 	if (ddvd_output_fd == -1) {
 		perror("/dev/video");
+		res = DDVD_BUSY;
 		goto err_open_output_fd;
 	}
 
 	ddvd_fdvideo = open("/dev/dvb/card0/video0", O_RDWR);
 	if (ddvd_fdvideo == -1) {
 		perror("/dev/dvb/card0/video0");
+		res = DDVD_BUSY;
 		goto err_open_fdvideo;
 	}
 
 	ddvd_fdaudio = open("/dev/dvb/card0/audio0", O_RDWR);
 	if (ddvd_fdaudio == -1) {
 		perror("/dev/dvb/card0/audio0");
+		res = DDVD_BUSY;
 		goto err_open_fdaudio;
 	}
 
 	ddvd_ac3_fd = open("/dev/sound/dsp1", O_RDWR);
 	if (ddvd_ac3_fd == -1) {
 		perror("/dev/sound/dsp1");
+		res = DDVD_BUSY;
 		goto err_open_ac3_fd;
 	}
 
@@ -424,12 +433,14 @@ void ddvd_run(struct ddvd *playerconfig)
 	ddvd_output_fd = ddvd_fdvideo = open("/dev/dvb/adapter0/video0", O_RDWR);
 	if (ddvd_fdvideo == -1) {
 		perror("/dev/dvb/adapter0/video0");
+		res = DDVD_BUSY;
 		goto err_open_fdvideo;
 	}
 
 	ddvd_ac3_fd = ddvd_fdaudio = open("/dev/dvb/adapter0/audio0", O_RDWR);
 	if (ddvd_fdaudio == -1) {
 		perror("/dev/dvb/adapter0/audio0");
+		res = DDVD_BUSY;
 		goto err_open_ac3_fd;
 	}
 
@@ -547,12 +558,14 @@ void ddvd_run(struct ddvd *playerconfig)
 		msg = DDVD_SHOWOSD_STRING;
 		safe_write(message_pipe, &msg, sizeof(int));
 		safe_write(message_pipe, &osdtext, sizeof(osdtext));
+		res = DDVD_FAIL_OPEN;
 		goto err_dvdnav_open;
 	}
 
 	/* set read ahead cache usage to no */
 	if (dvdnav_set_readahead_flag(dvdnav, 0) != DVDNAV_STATUS_OK) {
 		printf("Error on dvdnav_set_readahead_flag: %s\n", dvdnav_err_to_string(dvdnav));
+		res = DDVD_FAIL_PREFS;
 		goto err_dvdnav;
 	}
 
@@ -561,6 +574,7 @@ void ddvd_run(struct ddvd *playerconfig)
 	    dvdnav_audio_language_select(dvdnav, playerconfig->language) != DVDNAV_STATUS_OK ||
 	    dvdnav_spu_language_select(dvdnav, playerconfig->language) != DVDNAV_STATUS_OK) {
 		printf("Error on setting languages: %s\n", dvdnav_err_to_string(dvdnav));
+		res = DDVD_FAIL_PREFS;
 		goto err_dvdnav;
 	}
 
@@ -568,6 +582,7 @@ void ddvd_run(struct ddvd *playerconfig)
 	 * whole feature instead of just relatively to the current chapter */
 	if (dvdnav_set_PGC_positioning_flag(dvdnav, 1) != DVDNAV_STATUS_OK) {
 		printf("Error on dvdnav_set_PGC_positioning_flag: %s\n", dvdnav_err_to_string(dvdnav));
+		res = DDVD_FAIL_PREFS;
 		goto err_dvdnav;
 	}
 
@@ -650,6 +665,7 @@ void ddvd_run(struct ddvd *playerconfig)
 				msg = DDVD_SHOWOSD_STRING;
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &osdtext, sizeof(osdtext));
+				res = DDVD_FAIL_READ;
 				goto err_dvdnav;
 			}
 
@@ -1822,6 +1838,7 @@ err_malloc:
 #if CONFIG_API_VERSION == 3
 	ddvd_unset_pcr_offset();
 #endif
+	return res;
 }
 
 /*
