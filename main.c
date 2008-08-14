@@ -772,7 +772,7 @@ send_message:
 				/* We have received a regular block of the currently playing MPEG stream.
 				 * So we do some demuxing and decoding. */
 
-				// select audio data
+				// collect audio data
 				if (((buf[14 + 3]) & 0xF0) == 0xC0)
 					audio_format[(buf[14 + 3]) - 0xC0] = DDVD_MPEG;
 				if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xF8) == 0x80)
@@ -1213,7 +1213,18 @@ send_message:
 			case DVDNAV_AUDIO_STREAM_CHANGE:
 				/* We received a new Audio stream ID  */
 				if (!audio_lock)
+				{
 					audio_id = dvdnav_get_active_audio_stream(dvdnav);
+					uint16_t audio_lang = 0xFFFF;
+					audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id);
+					if (audio_lang == 0xFFFF)
+						audio_lang = 0x2D2D;					
+					msg = DDVD_SHOWOSD_AUDIO;
+					safe_write(message_pipe, &msg, sizeof(int));
+					safe_write(message_pipe, &audio_id, sizeof(int));
+					safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
+					safe_write(message_pipe, &audio_format[audio_id], sizeof(int));
+				}
 				break;
 
 			case DVDNAV_HIGHLIGHT:
