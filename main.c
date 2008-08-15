@@ -1580,25 +1580,6 @@ send_message:
 				case DDVD_UNSET_MUTE:
 					ismute = 0;
 					break;
-				case DDVD_KEY_EXIT:	//Exit
-					{
-						printf("DDVD_KEY_EXIT (menu)\n");
-						int resume_title, resume_chapter; //safe resume info
-						uint32_t resume_block, total_block;
-						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
-							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
-								playerconfig->resume_title = resume_title;
-								playerconfig->resume_chapter = resume_chapter;
-								playerconfig->resume_block = resume_block;
-								playerconfig->resume_audio_id = audio_id;
-								playerconfig->resume_audio_lock = audio_lock;
-								playerconfig->resume_spu_id = spu_active_id;
-								playerconfig->resume_spu_lock = spu_lock;
-							} else perror("error getting resume position");
-						} perror("error getting resume position");					
-						finished = 1;
-					}
-					break;				
 				default:
 					keydone = 0;
 					break;
@@ -1639,6 +1620,25 @@ send_message:
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Audio) == DVDNAV_STATUS_OK)
 						ddvd_play_empty(TRUE);
 					break;
+				case DDVD_KEY_EXIT:	//Exit
+					{
+						printf("DDVD_KEY_EXIT (menu)\n");
+						int resume_title, resume_chapter; //safe resume info
+						uint32_t resume_block, total_block;
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
+							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+								playerconfig->resume_title = 0;
+								playerconfig->resume_chapter = 0;
+								playerconfig->resume_block = 0;
+								playerconfig->resume_audio_id = 0;
+								playerconfig->resume_audio_lock = 0;
+								playerconfig->resume_spu_id = 0;
+								playerconfig->resume_spu_lock = 0;
+							} else perror("error getting resume position");
+						} perror("error getting resume position");					
+						finished = 1;
+					}
+					break;						
 				case DDVD_SKIP_FWD:
 				case DDVD_SKIP_BWD:
 				case DDVD_SET_TITLE:
@@ -1759,6 +1759,25 @@ key_play:
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Audio) == DVDNAV_STATUS_OK)
 						ddvd_play_empty(TRUE);
 					break;
+				case DDVD_KEY_EXIT:	//Exit
+					{
+						printf("DDVD_KEY_EXIT (menu)\n");
+						int resume_title, resume_chapter; //safe resume info
+						uint32_t resume_block, total_block;
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
+							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+								playerconfig->resume_title = resume_title;
+								playerconfig->resume_chapter = resume_chapter;
+								playerconfig->resume_block = resume_block;
+								playerconfig->resume_audio_id = audio_id;
+								playerconfig->resume_audio_lock = audio_lock;
+								playerconfig->resume_spu_id = spu_active_id;
+								playerconfig->resume_spu_lock = spu_lock;
+							} else perror("error getting resume position");
+						} perror("error getting resume position");					
+						finished = 1;
+					}
+					break;						
 				case DDVD_KEY_FFWD:	//FastForward
 				case DDVD_KEY_FBWD:	//FastBackward
 					{
