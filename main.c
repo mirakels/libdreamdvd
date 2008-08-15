@@ -128,7 +128,7 @@ struct ddvd *ddvd_create(void)
 	ddvd_set_dvd_path(pconfig, "/dev/cdroms/cdrom0");
 	ddvd_set_video(pconfig, DDVD_4_3_LETTERBOX, DDVD_PAL);
 	ddvd_set_lfb(pconfig, NULL, 720, 576, 1, 720);
-	ddvd_set_resume_pos(pconfig, 0, 0, 0);
+	ddvd_set_resume_pos(pconfig, 0, 0, 0, 0, 0, 0, 0);
 	pconfig->should_resume = 0;
 	pconfig->next_time_update = 0;
 	strcpy(pconfig->title_string, "");
@@ -170,12 +170,16 @@ int ddvd_get_messagepipe_fd(struct ddvd *pconfig)
 }
 
 // set resume postion
-void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block)
+void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block, int audio_id, int audio_lock, int spu_id, int spu_lock)
 {
 	pconfig->resume_title = title;
 	pconfig->resume_chapter = chapter;
 	pconfig->resume_block = block;
 	pconfig->should_resume = 1;
+	pconfig->resume_audio_id = audio_id;
+	pconfig->resume_audio_lock = audio_lock;
+	pconfig->resume_spu_id = spu_id;
+	pconfig->resume_spu_lock = spu_lock;
 }
 
 // set framebuffer options
@@ -338,11 +342,15 @@ void ddvd_get_title_string(struct ddvd *pconfig, char *title_string)
 }
 
 // get actual position for resuming
-void ddvd_get_resume_pos(struct ddvd *pconfig, int *title, int *chapter, uint32_t *block)
+void ddvd_get_resume_pos(struct ddvd *pconfig, int *title, int *chapter, uint32_t *block, int *audio_id, int *audio_lock, int *spu_id, int *spu_lock)
 {
 	memcpy(title, &pconfig->resume_title, sizeof(pconfig->resume_title));
 	memcpy(chapter, &pconfig->resume_chapter, sizeof(pconfig->resume_chapter));
 	memcpy(block, &pconfig->resume_block, sizeof(pconfig->resume_block));
+	memcpy(audio_id, &pconfig->resume_block, sizeof(pconfig->resume_audio_id));
+	memcpy(audio_lock, &pconfig->resume_block, sizeof(pconfig->resume_audio_lock));
+	memcpy(spu_id, &pconfig->resume_block, sizeof(pconfig->resume_spu_id));
+	memcpy(spu_lock, &pconfig->resume_block, sizeof(pconfig->resume_spu_lock));
 }
 
 // the main player loop
@@ -1409,7 +1417,14 @@ send_message:
 						next_cell_change = 0;
 						playerconfig->should_resume = 0;
 						if (dvdnav_sector_search(dvdnav, playerconfig->resume_block, SEEK_SET) != DVDNAV_STATUS_OK)
+						{
 							perror("DVD resuming failed");
+						} else {
+							audio_id = playerconfig->resume_audio_id;
+							audio_lock = playerconfig->resume_audio_lock;
+							spu_active_id = playerconfig->resume_spu_id;
+							spu_lock = playerconfig->resume_spu_lock;
+						}
 					}
 				}
 				break;
@@ -1441,6 +1456,10 @@ send_message:
 				playerconfig->resume_title = 0;
 				playerconfig->resume_chapter = 0;
 				playerconfig->resume_block = 0;
+				playerconfig->resume_audio_id = 0;
+				playerconfig->resume_audio_lock = 0;
+				playerconfig->resume_spu_id = 0;
+				playerconfig->resume_spu_lock = 0;
 				finished = 1;
 				break;
 
@@ -1591,6 +1610,10 @@ send_message:
 								playerconfig->resume_title = resume_title;
 								playerconfig->resume_chapter = resume_chapter;
 								playerconfig->resume_block = resume_block;
+								playerconfig->resume_audio_id = audio_id;
+								playerconfig->resume_audio_lock = audio_lock;
+								playerconfig->resume_spu_id = spu_active_id;
+								playerconfig->resume_spu_lock = spu_lock;
 							} else perror("error getting resume position");
 						} perror("error getting resume position");					
 						finished = 1;
@@ -1734,6 +1757,10 @@ key_play:
 								playerconfig->resume_title = resume_title;
 								playerconfig->resume_chapter = resume_chapter;
 								playerconfig->resume_block = resume_block;
+								playerconfig->resume_audio_id = audio_id;
+								playerconfig->resume_audio_lock = audio_lock;
+								playerconfig->resume_spu_id = spu_active_id;
+								playerconfig->resume_spu_lock = spu_lock;
 							} else perror("error getting resume position");
 						} perror("error getting resume position");
 						finished = 1;
