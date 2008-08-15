@@ -1216,7 +1216,9 @@ send_message:
 				{
 					audio_id = dvdnav_get_active_audio_stream(dvdnav);
 					uint16_t audio_lang = 0xFFFF;
-					audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id);
+					int audio_id_logical;
+					audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
+					audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
 					if (audio_lang == 0xFFFF)
 						audio_lang = 0x2D2D;					
 					msg = DDVD_SHOWOSD_AUDIO;
@@ -1682,12 +1684,15 @@ key_play:
 				case DDVD_KEY_AUDIO:	//change audio track 
 					{
 						uint16_t audio_lang = 0xFFFF;
-						while (audio_lang == 0xFFFF) {
-							audio_id++;
-							audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id);
-							if (audio_lang == 0xFFFF)
-								audio_id = -1;
+						int audio_id_logical;
+						int count = 0;
+						audio_id = (audio_id == 7 ? 0 : audio_id+1);
+						while (audio_format[audio_id] == -1 && count++ < 7)
+						{
+							audio_id = (audio_id == 7 ? 0 : audio_id+1);
 						}
+						audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
+						audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
 						ddvd_play_empty(TRUE);
 						audio_lock = 1;
 						ddvd_lpcm_count = 0;
