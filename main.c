@@ -1426,6 +1426,7 @@ send_message:
 							audio_lock = playerconfig->resume_audio_lock;
 							spu_active_id = playerconfig->resume_spu_id;
 							spu_lock = playerconfig->resume_spu_lock;
+							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
 					}
 				}
