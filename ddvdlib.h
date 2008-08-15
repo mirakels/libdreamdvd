@@ -29,9 +29,6 @@
  */
 struct ddvd; 
 
-/*
- * struct for resume info
- */ 
 struct ddvd_resume {
 	int title;
 	int chapter;
@@ -260,7 +257,7 @@ enum { // aspect
 
 
 /* 
- * structs for color palette and osd time 
+ * structs for color palette and osd time and resume info
  */
 
 struct ddvd_color { 

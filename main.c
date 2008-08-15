@@ -29,8 +29,6 @@
 
 #include <poll.h>
 
-#define CONVERT_TO_DVB_COMPLIANT_AC3
-
 /*
  * local helper functions
  */
@@ -349,10 +347,10 @@ void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info)
 	memcpy(&resume_info->title, &pconfig->resume_title, sizeof(pconfig->resume_title));
 	memcpy(&resume_info->chapter, &pconfig->resume_chapter, sizeof(pconfig->resume_chapter));
 	memcpy(&resume_info->block, &pconfig->resume_block, sizeof(pconfig->resume_block));
-	memcpy(&resume_info->audio_id, &pconfig->resume_block, sizeof(pconfig->resume_audio_id));
-	memcpy(&resume_info->audio_lock, &pconfig->resume_block, sizeof(pconfig->resume_audio_lock));
-	memcpy(&resume_info->spu_id, &pconfig->resume_block, sizeof(pconfig->resume_spu_id));
-	memcpy(&resume_info->spu_lock, &pconfig->resume_block, sizeof(pconfig->resume_spu_lock));
+	memcpy(&resume_info->audio_id, &pconfig->resume_audio_id, sizeof(pconfig->resume_audio_id));
+	memcpy(&resume_info->audio_lock, &pconfig->resume_audio_lock, sizeof(pconfig->resume_audio_lock));
+	memcpy(&resume_info->spu_id, &pconfig->resume_spu_id, sizeof(pconfig->resume_spu_id));
+	memcpy(&resume_info->spu_lock, &pconfig->resume_spu_lock, sizeof(pconfig->resume_spu_lock));
 }
 
 // the main player loop
@@ -1565,15 +1563,34 @@ send_message:
 
 			switch (rccode)	// actions inside and outside of menu
 			{
-			case DDVD_SET_MUTE:
-				ismute = 1;
-				break;
-			case DDVD_UNSET_MUTE:
-				ismute = 0;
-				break;
-			default:
-				keydone = 0;
-				break;
+				case DDVD_SET_MUTE:
+					ismute = 1;
+					break;
+				case DDVD_UNSET_MUTE:
+					ismute = 0;
+					break;
+				case DDVD_KEY_EXIT:	//Exit
+					{
+						printf("DDVD_KEY_EXIT (menu)\n");
+						int resume_title, resume_chapter; //safe resume info
+						uint32_t resume_block, total_block;
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
+							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+								playerconfig->resume_title = resume_title;
+								playerconfig->resume_chapter = resume_chapter;
+								playerconfig->resume_block = resume_block;
+								playerconfig->resume_audio_id = audio_id;
+								playerconfig->resume_audio_lock = audio_lock;
+								playerconfig->resume_spu_id = spu_active_id;
+								playerconfig->resume_spu_lock = spu_lock;
+							} else perror("error getting resume position");
+						} perror("error getting resume position");					
+						finished = 1;
+					}
+					break;				
+				default:
+					keydone = 0;
+					break;
 			}
 
 			if (!keydone && in_menu) {
@@ -1602,25 +1619,6 @@ send_message:
 					ddvd_play_empty(TRUE);
 					if (ddvd_wait_timer_active)
 						ddvd_wait_timer_active = 0;
-					break;
-				case DDVD_KEY_EXIT:	//Exit
-					{
-						printf("DDVD_KEY_EXIT (menu)\n");
-						int resume_title, resume_chapter; //safe resume info
-						uint32_t resume_block, total_block;
-						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
-							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
-								playerconfig->resume_title = resume_title;
-								playerconfig->resume_chapter = resume_chapter;
-								playerconfig->resume_block = resume_block;
-								playerconfig->resume_audio_id = audio_id;
-								playerconfig->resume_audio_lock = audio_lock;
-								playerconfig->resume_spu_id = spu_active_id;
-								playerconfig->resume_spu_lock = spu_lock;
-							} else perror("error getting resume position");
-						} perror("error getting resume position");					
-						finished = 1;
-					}
 					break;
 				case DDVD_KEY_MENU:	//Dream
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Root) == DVDNAV_STATUS_OK)
@@ -1750,25 +1748,6 @@ key_play:
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Audio) == DVDNAV_STATUS_OK)
 						ddvd_play_empty(TRUE);
 					break;
-				case DDVD_KEY_EXIT:	//EXIT 
-					{
-						printf("DDVD_KEY_EXIT\n");
-						int resume_title, resume_chapter; //safe resume info
-						uint32_t resume_block, total_block;
-						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
-							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
-								playerconfig->resume_title = resume_title;
-								playerconfig->resume_chapter = resume_chapter;
-								playerconfig->resume_block = resume_block;
-								playerconfig->resume_audio_id = audio_id;
-								playerconfig->resume_audio_lock = audio_lock;
-								playerconfig->resume_spu_id = spu_active_id;
-								playerconfig->resume_spu_lock = spu_lock;
-							} else perror("error getting resume position");
-						} perror("error getting resume position");
-						finished = 1;
-						break;
-					}
 				case DDVD_KEY_FFWD:	//FastForward
 				case DDVD_KEY_FBWD:	//FastBackward
 					{

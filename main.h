@@ -30,6 +30,8 @@
 // set to 1 if a start screen should be displayed
 #define SHOW_START_SCREEN 1
 
+#define CONVERT_TO_DVB_COMPLIANT_AC3
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
