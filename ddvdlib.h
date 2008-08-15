@@ -32,7 +32,15 @@ struct ddvd;
 /*
  * struct for resume info
  */ 
-struct ddvd_resume;
+struct ddvd_resume {
+	int title;
+	int chapter;
+	uint32_t block;
+	int audio_id;
+	int audio_lock;
+	int spu_id;
+	int spu_lock;
+};
 
 enum ddvd_result {
 	DDVD_OK = 0,
