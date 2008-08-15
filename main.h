@@ -189,6 +189,17 @@ struct ddvd {
 	int should_resume;
 };
 
+/* struct for resume info */
+struct ddvd_resume {
+	int title;
+	int chapter;
+	uint32_t block;
+	int audio_id;
+	int audio_lock;
+	int spu_id;
+	int spu_lock;
+};
+
 /* internal functions */
 static struct 		ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig);
 static int 		ddvd_readpipe(int pipefd, void *dest, size_t bytes, int blocked_read);

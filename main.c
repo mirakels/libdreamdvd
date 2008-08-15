@@ -128,7 +128,9 @@ struct ddvd *ddvd_create(void)
 	ddvd_set_dvd_path(pconfig, "/dev/cdroms/cdrom0");
 	ddvd_set_video(pconfig, DDVD_4_3_LETTERBOX, DDVD_PAL);
 	ddvd_set_lfb(pconfig, NULL, 720, 576, 1, 720);
-	ddvd_set_resume_pos(pconfig, 0, 0, 0, 0, 0, 0, 0);
+	struct ddvd_resume resume_info;
+	resume_info.title=resume_info.chapter=resume_info.block=resume_info.audio_id=resume_info.audio_lock=resume_info.spu_id=resume_info.spu_lock=0;
+	ddvd_set_resume_pos(pconfig, resume_info);
 	pconfig->should_resume = 0;
 	pconfig->next_time_update = 0;
 	strcpy(pconfig->title_string, "");
@@ -170,16 +172,16 @@ int ddvd_get_messagepipe_fd(struct ddvd *pconfig)
 }
 
 // set resume postion
-void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block, int audio_id, int audio_lock, int spu_id, int spu_lock)
+void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info)
 {
-	pconfig->resume_title = title;
-	pconfig->resume_chapter = chapter;
-	pconfig->resume_block = block;
+	pconfig->resume_title = resume_info.title;
+	pconfig->resume_chapter = resume_info.chapter;
+	pconfig->resume_block = resume_info.block;
 	pconfig->should_resume = 1;
-	pconfig->resume_audio_id = audio_id;
-	pconfig->resume_audio_lock = audio_lock;
-	pconfig->resume_spu_id = spu_id;
-	pconfig->resume_spu_lock = spu_lock;
+	pconfig->resume_audio_id = resume_info.audio_id;
+	pconfig->resume_audio_lock = resume_info.audio_lock;
+	pconfig->resume_spu_id = resume_info.spu_id;
+	pconfig->resume_spu_lock = resume_info.spu_lock;
 }
 
 // set framebuffer options
@@ -342,15 +344,15 @@ void ddvd_get_title_string(struct ddvd *pconfig, char *title_string)
 }
 
 // get actual position for resuming
-void ddvd_get_resume_pos(struct ddvd *pconfig, int *title, int *chapter, uint32_t *block, int *audio_id, int *audio_lock, int *spu_id, int *spu_lock)
+void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info)
 {
-	memcpy(title, &pconfig->resume_title, sizeof(pconfig->resume_title));
-	memcpy(chapter, &pconfig->resume_chapter, sizeof(pconfig->resume_chapter));
-	memcpy(block, &pconfig->resume_block, sizeof(pconfig->resume_block));
-	memcpy(audio_id, &pconfig->resume_block, sizeof(pconfig->resume_audio_id));
-	memcpy(audio_lock, &pconfig->resume_block, sizeof(pconfig->resume_audio_lock));
-	memcpy(spu_id, &pconfig->resume_block, sizeof(pconfig->resume_spu_id));
-	memcpy(spu_lock, &pconfig->resume_block, sizeof(pconfig->resume_spu_lock));
+	memcpy(&resume_info->title, &pconfig->resume_title, sizeof(pconfig->resume_title));
+	memcpy(&resume_info->chapter, &pconfig->resume_chapter, sizeof(pconfig->resume_chapter));
+	memcpy(&resume_info->block, &pconfig->resume_block, sizeof(pconfig->resume_block));
+	memcpy(&resume_info->audio_id, &pconfig->resume_block, sizeof(pconfig->resume_audio_id));
+	memcpy(&resume_info->audio_lock, &pconfig->resume_block, sizeof(pconfig->resume_audio_lock));
+	memcpy(&resume_info->spu_id, &pconfig->resume_block, sizeof(pconfig->resume_spu_id));
+	memcpy(&resume_info->spu_lock, &pconfig->resume_block, sizeof(pconfig->resume_spu_lock));
 }
 
 // the main player loop

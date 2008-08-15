@@ -29,6 +29,11 @@
  */
 struct ddvd; 
 
+/*
+ * struct for resume info
+ */ 
+struct ddvd_resume;
+
 enum ddvd_result {
 	DDVD_OK = 0,
 	DDVD_INVAL,
@@ -73,7 +78,7 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru);
 void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_system);
 
 // set resume postion for dvd start
-void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block, int audio_id, int audio_lock, int spu_id, int spu_lock);
+void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info);
 
 /* 
  * functions for starting the dvd player
@@ -139,7 +144,7 @@ void ddvd_get_last_spu(struct ddvd*pconfig, void *id, void *lang);
 void ddvd_get_title_string(struct ddvd*pconfig, char *title_string);
 
 // get last received position for resume
-void ddvd_get_resume_pos(struct ddvd *pconfig, int *title, int *chapter, uint32_t *block, int *audio_id, int *audio_lock, int *spu_id, int *spu_lock);
+void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info);
 
 /* 
  * functions for clean up AFTER the player had stopped
