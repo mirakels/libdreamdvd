@@ -32,7 +32,7 @@ struct ddvd;
 struct ddvd_resume {
 	int title;
 	int chapter;
-	uint32_t block;
+	unsigned long int block;
 	int audio_id;
 	int audio_lock;
 	int spu_id;
