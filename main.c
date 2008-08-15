@@ -1424,6 +1424,17 @@ send_message:
 							audio_lock = playerconfig->resume_audio_lock;
 							spu_active_id = playerconfig->resume_spu_id;
 							spu_lock = playerconfig->resume_spu_lock;
+							uint16_t audio_lang = 0xFFFF;
+							int audio_id_logical;
+							audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
+							audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
+							if (audio_lang == 0xFFFF)
+								audio_lang = 0x2D2D;					
+							msg = DDVD_SHOWOSD_AUDIO;
+							safe_write(message_pipe, &msg, sizeof(int));
+							safe_write(message_pipe, &audio_id, sizeof(int));
+							safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
+							safe_write(message_pipe, &audio_format[audio_id], sizeof(int));							
 							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
 					}
@@ -1478,7 +1489,7 @@ send_message:
 		pts = (unsigned long long)tpts;
 		signed long long diff = spts - pts;
 		if (ddvd_spu_backnr > 0 && diff <= 0xFF)	// we only have a 32bit pts on vulcan/pallas (instead of 33bit) so we need some tolerance on syncing SPU for menus
-			// so on non animated menus the buttons will be displayed to soon, but we we have to accept it
+													// so on non animated menus the buttons will be displayed to soon, but we we have to accept it
 #else
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
 			perror("VIDEO_GET_PTS");
