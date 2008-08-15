@@ -1394,6 +1394,13 @@ send_message:
 							next_cell_change = 1;
 						} else {
 							playerconfig->should_resume = 0;
+							playerconfig->resume_title = 0;
+							playerconfig->resume_chapter = 0;
+							playerconfig->resume_block = 0;
+							playerconfig->resume_audio_id = 0;
+							playerconfig->resume_audio_lock = 0;
+							playerconfig->resume_spu_id = 0;
+							playerconfig->resume_spu_lock = 0;							
 							perror("DVD resuming failed");
 						}
 						
@@ -1437,6 +1444,13 @@ send_message:
 							safe_write(message_pipe, &audio_format[audio_id], sizeof(int));							
 							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
+						playerconfig->resume_title = 0;
+						playerconfig->resume_chapter = 0;
+						playerconfig->resume_block = 0;
+						playerconfig->resume_audio_id = 0;
+						playerconfig->resume_audio_lock = 0;
+						playerconfig->resume_spu_id = 0;
+						playerconfig->resume_spu_lock = 0;
 					}
 				}
 				break;
