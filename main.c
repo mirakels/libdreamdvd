@@ -1436,12 +1436,22 @@ send_message:
 							audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
 							audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
 							if (audio_lang == 0xFFFF)
-								audio_lang = 0x2D2D;					
+								audio_lang = 0x2D2D;	
+							uint16_t spu_lang = 0xFFFF;
+							spu_lang = dvdnav_spu_stream_to_lang(dvdnav, spu_active_id);
+							if (spu_lang == 0xFFFF) {
+								spu_lang = 0x2D2D;	// SPU "off" 
+								spu_active_id = -1;
+							}							
 							msg = DDVD_SHOWOSD_AUDIO;
 							safe_write(message_pipe, &msg, sizeof(int));
 							safe_write(message_pipe, &audio_id, sizeof(int));
 							safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
-							safe_write(message_pipe, &audio_format[audio_id], sizeof(int));							
+							safe_write(message_pipe, &audio_format[audio_id], sizeof(int));
+							msg = DDVD_SHOWOSD_SUBTITLE;
+							safe_write(message_pipe, &msg, sizeof(int));
+							safe_write(message_pipe, &spu_active_id, sizeof(int));
+							safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
 						playerconfig->resume_title = 0;
