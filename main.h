@@ -179,6 +179,10 @@ struct ddvd {
 	uint16_t last_spu_lang;			// active subtitle language
 	uint64_t next_time_update;
 	int in_menu;
+	int resume_title;				// title, chapter, block for resuming dvd or
+	int resume_chapter;				// getting actual resume position
+	uint32_t resume_block;
+	int should_resume;
 };
 
 /* internal functions */

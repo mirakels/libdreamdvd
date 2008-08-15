@@ -72,6 +72,8 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru);
 // set video options for aspect and the tv system, see enums for possible options
 void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_system);
 
+// set resume postion for dvd start
+void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block);
 
 /* 
  * functions for starting the dvd player
@@ -133,7 +135,11 @@ void ddvd_get_last_audio(struct ddvd*pconfig, void *id, void *lang, void *type);
 // id=-1 means no subtitle track active
 void ddvd_get_last_spu(struct ddvd*pconfig, void *id, void *lang);
 
+// get dvd title string
 void ddvd_get_title_string(struct ddvd*pconfig, char *title_string);
+
+// get last received position for resume
+void ddvd_get_resume_pos(struct ddvd*pconfig, int *title, int *chapter, uint32_t *block);
 
 /* 
  * functions for clean up AFTER the player had stopped

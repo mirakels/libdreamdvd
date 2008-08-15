@@ -128,6 +128,8 @@ struct ddvd *ddvd_create(void)
 	ddvd_set_dvd_path(pconfig, "/dev/cdroms/cdrom0");
 	ddvd_set_video(pconfig, DDVD_4_3_LETTERBOX, DDVD_PAL);
 	ddvd_set_lfb(pconfig, NULL, 720, 576, 1, 720);
+	ddvd_set_resume_pos(pconfig, 0, 0, 0);
+	pconfig->should_resume = 0;
 	pconfig->next_time_update = 0;
 	strcpy(pconfig->title_string, "");
 
@@ -165,6 +167,15 @@ void ddvd_close(struct ddvd *pconfig)
 int ddvd_get_messagepipe_fd(struct ddvd *pconfig)
 {
 	return pconfig->message_pipe[0];
+}
+
+// set resume postion
+void ddvd_set_resume_pos(struct ddvd *pconfig, int title, int chapter, uint32_t block)
+{
+	pconfig->resume_title = title;
+	pconfig->resume_chapter = chapter;
+	pconfig->resume_block = block;
+	pconfig->should_resume = 1;
 }
 
 // set framebuffer options
@@ -320,9 +331,18 @@ void ddvd_get_last_spu(struct ddvd *pconfig, void *id, void *lang)
 	memcpy(lang, &pconfig->last_spu_lang, sizeof(pconfig->last_spu_lang));
 }
 
+// get dvd title string
 void ddvd_get_title_string(struct ddvd *pconfig, char *title_string)
 {
 	memcpy(title_string, pconfig->title_string, sizeof(pconfig->title_string));
+}
+
+// get actual position for resuming
+void ddvd_get_resume_pos(struct ddvd *pconfig, int *title, int *chapter, uint32_t *block)
+{
+	memcpy(title, &pconfig->resume_title, sizeof(pconfig->resume_title));
+	memcpy(chapter, &pconfig->resume_chapter, sizeof(pconfig->resume_chapter));
+	memcpy(block, &pconfig->resume_block, sizeof(pconfig->resume_block));
 }
 
 // the main player loop
@@ -333,6 +353,10 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		return DDVD_INVAL;
 	}
 
+	// we need to know the first vts_change and the next cell change for resuming a dvd
+	int first_vts_change = 1;
+	int next_cell_change = 0;
+	
 	ddvd_screeninfo_xres = playerconfig->xres;
 	ddvd_screeninfo_yres = playerconfig->yres;
 	ddvd_screeninfo_stride = playerconfig->stride;
@@ -1338,27 +1362,56 @@ send_message:
 				break;
 
 			case DVDNAV_VTS_CHANGE:
-				/* Some status information like video aspect and video scale permissions do
-				 * not change inside a VTS. Therefore we will set it new at this place */
-				ddvd_play_empty(TRUE);
-				audio_lock = 0;	// reset audio & spu lock
-				spu_lock = 0;
-				audio_format[0] = audio_format[1] = audio_format[2] = audio_format[4] = audio_format[4] = audio_format[5] = audio_format[6] = audio_format[7] = -1;
+				{
+					/* Some status information like video aspect and video scale permissions do
+					 * not change inside a VTS. Therefore we will set it new at this place */
+					ddvd_play_empty(TRUE);
+					audio_lock = 0;	// reset audio & spu lock
+					spu_lock = 0;
+					audio_format[0] = audio_format[1] = audio_format[2] = audio_format[4] = audio_format[4] = audio_format[5] = audio_format[6] = audio_format[7] = -1;
 
-				dvd_aspect = dvdnav_get_video_aspect(dvdnav);
-				dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
-				tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect);
-				//printf("DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n",dvd_aspect,tv_aspect,tv_scale,dvd_scale_perm);
+					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
+					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
+					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect);
+					//printf("DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n",dvd_aspect,tv_aspect,tv_scale,dvd_scale_perm);
+					
+					// resuming a dvd ?
+					if (playerconfig->should_resume && first_vts_change) {
+						first_vts_change = 0;
+						int title_numbers,part_numbers;
+						dvdnav_get_number_of_titles(dvdnav, &title_numbers);
+						dvdnav_get_number_of_parts(dvdnav, playerconfig->resume_title, &part_numbers);
+						if (playerconfig->resume_title <= title_numbers && playerconfig->resume_title > 0 && playerconfig->resume_chapter <= part_numbers && playerconfig->resume_chapter > 0) {
+							dvdnav_part_play(dvdnav, playerconfig->resume_title, playerconfig->resume_chapter);
+							next_cell_change = 1;
+						} else {
+							playerconfig->should_resume = 0;
+							perror("DVD resuming failed");
+						}
+						
+						
+					}
+				}
 				break;
 
 			case DVDNAV_CELL_CHANGE:
-				/* Store new cell information */
-				memcpy(&ddvd_lastCellEventInfo, buf, sizeof(dvdnav_cell_change_event_t));
+				{
+					/* Store new cell information */
+					memcpy(&ddvd_lastCellEventInfo, buf, sizeof(dvdnav_cell_change_event_t));
 
-				if ((ddvd_still_frame & CELL_STILL) && ddvd_iframesend == 0 && ddvd_last_iframe_len)
-					ddvd_iframesend = 1;
+					if ((ddvd_still_frame & CELL_STILL) && ddvd_iframesend == 0 && ddvd_last_iframe_len)
+						ddvd_iframesend = 1;
 
-				ddvd_still_frame = (dvdnav_get_next_still_flag(dvdnav) != 0) ? CELL_STILL : 0;
+					ddvd_still_frame = (dvdnav_get_next_still_flag(dvdnav) != 0) ? CELL_STILL : 0;
+					
+					// resuming a dvd ?
+					if (playerconfig->should_resume && next_cell_change) {
+						next_cell_change = 0;
+						playerconfig->should_resume = 0;
+						if (dvdnav_sector_search(dvdnav, playerconfig->resume_block, SEEK_SET) != DVDNAV_STATUS_OK)
+							perror("DVD resuming failed");
+					}
+				}
 				break;
 
 			case DVDNAV_NAV_PACKET:
@@ -1385,6 +1438,9 @@ send_message:
 			case DVDNAV_STOP:
 				/* Playback should end here. */
 				printf("DVDNAV_STOP\n");
+				playerconfig->resume_title = 0;
+				playerconfig->resume_chapter = 0;
+				playerconfig->resume_block = 0;
 				finished = 1;
 				break;
 
@@ -1526,8 +1582,19 @@ send_message:
 						ddvd_wait_timer_active = 0;
 					break;
 				case DDVD_KEY_EXIT:	//Exit
-					printf("DDVD_KEY_EXIT (menu)\n");
-					finished = 1;
+					{
+						printf("DDVD_KEY_EXIT (menu)\n");
+						int resume_title, resume_chapter; //safe resume info
+						uint32_t resume_block, total_block;
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
+							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+								playerconfig->resume_title = resume_title;
+								playerconfig->resume_chapter = resume_chapter;
+								playerconfig->resume_block = resume_block;
+							} else perror("error getting resume position");
+						} perror("error getting resume position");					
+						finished = 1;
+					}
 					break;
 				case DDVD_KEY_MENU:	//Dream
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Root) == DVDNAV_STATUS_OK)
@@ -1660,6 +1727,15 @@ key_play:
 				case DDVD_KEY_EXIT:	//EXIT 
 					{
 						printf("DDVD_KEY_EXIT\n");
+						int resume_title, resume_chapter; //safe resume info
+						uint32_t resume_block, total_block;
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
+							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+								playerconfig->resume_title = resume_title;
+								playerconfig->resume_chapter = resume_chapter;
+								playerconfig->resume_block = resume_block;
+							} else perror("error getting resume position");
+						} perror("error getting resume position");
 						finished = 1;
 						break;
 					}
