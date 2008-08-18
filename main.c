@@ -1238,17 +1238,7 @@ send_message:
 				default:	// should not happen
 					spu_active_id = ev->physical_wide;
 					break;
-				}
-				uint16_t spu_lang = 0xFFFF; // report new spu track to the frontend
-				int spu_id_logical;
-				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
-				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
-				if (spu_lang == 0xFFFF)
-					spu_lang = 0x2D2D;
-				msg = DDVD_SHOWOSD_SUBTITLE;
-				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &spu_active_id, sizeof(int));
-				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));				
+				}		
 				//printf("SPU Stream change: w %X l: %X p: %X active: %X\n",ev->physical_wide,ev->physical_letterbox,ev->physical_pan_scan,spu_active_id);
 				break;
 
