@@ -1239,6 +1239,16 @@ send_message:
 					spu_active_id = ev->physical_wide;
 					break;
 				}
+				uint16_t spu_lang = 0xFFFF; // report new spu track to the frontend
+				int spu_id_logical;
+				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
+				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
+				if (spu_lang == 0xFFFF)
+					spu_lang = 0x2D2D;
+				msg = DDVD_SHOWOSD_SUBTITLE;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &spu_active_id, sizeof(int));
+				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));				
 				//printf("SPU Stream change: w %X l: %X p: %X active: %X\n",ev->physical_wide,ev->physical_letterbox,ev->physical_pan_scan,spu_active_id);
 				break;
 
@@ -1247,10 +1257,10 @@ send_message:
 				if (!audio_lock)
 				{
 					audio_id = dvdnav_get_active_audio_stream(dvdnav);
-					uint16_t audio_lang = 0xFFFF;
+					uint16_t audio_lang = 0xFFFF; // report new audio track to the frontend
 					int audio_id_logical;
 					audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
-					audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
+					audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical >= 0 ? audio_id_logical : audio_id);
 					if (audio_lang == 0xFFFF)
 						audio_lang = 0x2D2D;					
 					msg = DDVD_SHOWOSD_AUDIO;
@@ -1373,7 +1383,7 @@ send_message:
 				{
 					/* Some status information like video aspect and video scale permissions do
 					 * not change inside a VTS. Therefore we will set it new at this place */
-					ddvd_play_empty(TRUE);
+					//ddvd_play_empty(TRUE);
 					audio_lock = 0;	// reset audio & spu lock
 					spu_lock = 0;
 					audio_format[0] = audio_format[1] = audio_format[2] = audio_format[4] = audio_format[4] = audio_format[5] = audio_format[6] = audio_format[7] = -1;
@@ -1831,7 +1841,7 @@ key_play:
 							audio_id = (audio_id == 7 ? 0 : audio_id+1);
 						}
 						audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
-						audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
+						audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical >= 0 ? audio_id_logical : audio_id);
 						ddvd_play_empty(TRUE);
 						audio_lock = 1;
 						ddvd_lpcm_count = 0;
@@ -1845,13 +1855,13 @@ key_play:
 				case DDVD_KEY_SUBTITLE:	//change spu track 
 					{
 						uint16_t spu_lang = 0xFFFF;
-						while (spu_lang == 0xFFFF) {
-							spu_active_id++;
-							spu_lang = dvdnav_spu_stream_to_lang(dvdnav, spu_active_id);
-							if (spu_lang == 0xFFFF) {
-								spu_lang = 0x2D2D;	// SPU "off" 
-								spu_active_id = -1;
-							}
+						int spu_id_logical;
+						spu_active_id++;
+						spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
+						spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
+						if (spu_lang == 0xFFFF) {
+							spu_lang = 0x2D2D;	// SPU "off" 
+							spu_active_id = -1;
 						}
 						spu_lock = 1;
 						msg = DDVD_SHOWOSD_SUBTITLE;
