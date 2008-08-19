@@ -364,6 +364,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	// we need to know the first vts_change and the next cell change for resuming a dvd
 	int first_vts_change = 1;
 	int next_cell_change = 0;
+	int ddvd_have_ntsc = -1;
 	
 	ddvd_screeninfo_xres = playerconfig->xres;
 	ddvd_screeninfo_yres = playerconfig->yres;
@@ -843,6 +844,15 @@ send_message:
 						if (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3) {
 							buf[36 + 7] = (buf[36 + 7] & 0xF) + 0x30;
 						}
+					}
+					
+					// check yres for detecting ntsc/pal
+					if (ddvd_have_ntsc == -1) {
+						if ((buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3 && ((buf[33+5] & 0xF) << 8) + buf[33+6] == 0x1E0) 
+							|| (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3 && ((buf[36+5] & 0xF) << 8) + buf[36+6] == 0x1E0))
+							ddvd_have_ntsc = 1;
+						else
+							ddvd_have_ntsc = 0;
 					}
 
 					safe_write(ddvd_output_fd, buf + 14, 2048 - 14);
@@ -1361,6 +1371,8 @@ send_message:
 					if (!libdvdnav_workaround)
 						memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen .. 
 
+					if (ddvd_have_ntsc == 1)
+						ddvd_resize_pixmap(p_lfb, 720, 480, 720, 576, ddvd_screeninfo_bypp);
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 				} else {
@@ -1522,6 +1534,7 @@ send_message:
 		{
 			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 
+			memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//clear backbuffer .. 
 			ddvd_display_time = ddvd_spu_decode_data(spu_backbuffer, tmplen);	// decode
 			ddvd_lbb_changed = 1;
 
@@ -1931,6 +1944,8 @@ key_play:
 				for (; i < ddvd_screeninfo_yres; ++i)
 					ddvd_blit_to_argb(p_lfb + i * ddvd_screeninfo_stride, ddvd_lbb + i * ddvd_screeninfo_xres, ddvd_screeninfo_xres);
 			}
+			if (ddvd_have_ntsc == 1)
+				ddvd_resize_pixmap(p_lfb, 720, 480, 720, 576, ddvd_screeninfo_bypp);
 			int msg_old = msg;	// save and restore msg it may not bee empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2400,3 +2415,83 @@ static void ddvd_unset_pcr_offset(void)
 }
 
 #endif
+
+void ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
+{
+	
+	float fx,fy,tmp_f/*,dpixel*/;
+	unsigned int xs,ys,xd,yd,dpixel;
+	unsigned int c,tmp_i;
+	int x,y,t,t1;
+	xs=xsource; // x-resolution source
+	ys=ysource; // y-resolution source
+	xd=xdest; // x-resolution destination
+	yd=ydest; // y-resolution destination
+	unsigned char *pixmap_tmp;
+	pixmap_tmp = (unsigned char *)malloc(xsource*ysource*colors);
+	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
+	
+	// get x scale factor
+	fx=(float)(xs-1)/(float)xd;
+
+	// get y scale factor
+	fy=(float)(ys-1)/(float)yd;
+
+	unsigned int sx1[xd],sx2[xd],sy1,sy2;
+	
+	// pre calculating sx1/sx2 for faster resizing
+	for (x=0; x<xd; x++) 
+	{
+		// first x source pixel for calculating destination pixel
+		tmp_f=fx*(float)x;
+		sx1[x]=(int)tmp_f; //floor()
+
+		// last x source pixel for calculating destination pixel
+		tmp_f=(float)sx1[x]+fx;
+		sx2[x]=(int)tmp_f;
+		if ((float)sx2[x] < tmp_f) {sx2[x]+=1;} //ceil()		
+	}
+	
+	// Scale
+	for (y=0; y<yd; y++) 
+	{
+
+		// first y source pixel for calculating destination pixel
+		tmp_f=fy*(float)y;
+		sy1=(int)tmp_f; //floor()
+
+		// last y source pixel for calculating destination pixel
+		tmp_f=(float)sy1+fy;
+		sy2=(int)tmp_f;
+		if ((float)sy2 < tmp_f) {sy2+=1;} //ceil()	
+
+		for (x=0; x<xd; x++) 
+		{
+			// we do this for every color
+			for (c=0; c<colors; c++) 
+			{
+				// calculationg destination pixel
+				tmp_i=0;
+				dpixel=0;
+		
+				for (t1=sy1; t1<sy2; t1++) 
+				{
+					for (t=sx1[x]; t<=sx2[x]; t++) 
+					{
+						tmp_i+=(int)pixmap_tmp[(t*colors)+c+(t1*xs*colors)];
+						dpixel++;		
+					}
+				}
+		
+				//tmp_f=(float)tmp_i/dpixel;
+				//tmp_i=(int)tmp_f;
+				//if ((float)tmp_i+0.5 <= tmp_f) {tmp_i+=1;} //round()
+				tmp_i=tmp_i/dpixel; // working with integers is not correct, but much faster and +-1 inside the color values doesnt really matter
+				
+				// writing calculated pixel into destination pixmap
+				pixmap[(x*colors)+c+(y*xd*colors)]=tmp_i;
+			}
+		}
+	}
+	free(pixmap_tmp);
+}

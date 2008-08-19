@@ -204,5 +204,6 @@ static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
+void 				ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
 
 #endif
