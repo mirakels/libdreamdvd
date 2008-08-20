@@ -1255,8 +1255,7 @@ send_message:
 				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
 				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 				if (spu_lang == 0xFFFF) {
-					spu_lang = 0x2D2D;	// SPU "off" 
-					spu_active_id = -1;
+					spu_lang = 0x2D2D;	// SPU "off, unknown or maybe menuoverlays" 
 				}							
 				msg = DDVD_SHOWOSD_SUBTITLE;
 				safe_write(message_pipe, &msg, sizeof(int));
