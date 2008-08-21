@@ -1941,11 +1941,13 @@ key_play:
 				audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
 				if (audio_lang == 0xFFFF)
 					audio_lang = 0x2D2D;	
+				int msg_old = msg;	// save and restore msg it may not bee empty
 				msg = DDVD_SHOWOSD_AUDIO;
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &audio_id, sizeof(int));
 				safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
 				safe_write(message_pipe, &audio_format[audio_id], sizeof(int));
+				msg = msg_old;
 				report_audio_info = 0;
 			}
 		}
