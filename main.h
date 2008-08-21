@@ -205,5 +205,6 @@ static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
 void 				ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
+void				ddvd_resize_pixmap_simple(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
 
 #endif

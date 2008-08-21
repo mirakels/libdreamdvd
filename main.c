@@ -1373,8 +1373,12 @@ send_message:
 					if (!libdvdnav_workaround)
 						memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen .. 
 
-					if (ddvd_have_ntsc == 1)
-						ddvd_resize_pixmap(p_lfb, 720, 480, 720, 576, ddvd_screeninfo_bypp);
+					if (ddvd_have_ntsc == 1) {
+						if (ddvd_screeninfo_bypp == 1)
+							ddvd_resize_pixmap_simple(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
+						else
+							ddvd_resize_pixmap(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
+					}
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 				} else {
@@ -1924,8 +1928,12 @@ key_play:
 				for (; i < ddvd_screeninfo_yres; ++i)
 					ddvd_blit_to_argb(p_lfb + i * ddvd_screeninfo_stride, ddvd_lbb + i * ddvd_screeninfo_xres, ddvd_screeninfo_xres);
 			}
-			if (ddvd_have_ntsc == 1)
-				ddvd_resize_pixmap(p_lfb, 720, 480, 720, 576, ddvd_screeninfo_bypp);
+			if (ddvd_have_ntsc == 1) {
+				if (ddvd_screeninfo_bypp == 1)
+					ddvd_resize_pixmap_simple(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
+				else
+					ddvd_resize_pixmap(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
+			}
 			int msg_old = msg;	// save and restore msg it may not bee empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2413,6 +2421,7 @@ static void ddvd_unset_pcr_offset(void)
 
 #endif
 
+// bicubic picture resize
 void ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
 {
 	
@@ -2489,6 +2498,29 @@ void ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xde
 				pixmap[(x*colors)+c+(y*xd*colors)]=tmp_i;
 			}
 		}
+	}
+	free(pixmap_tmp);
+}
+
+// simple linear resize used for 1bypp mode, this routine is only able to upscale yres so dont use it for anything else !
+void ddvd_resize_pixmap_simple(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
+{
+	unsigned char *pixmap_tmp;
+	pixmap_tmp = (unsigned char *)malloc(xsource * ysource * colors);
+	memcpy(pixmap_tmp, pixmap, xsource * ysource * colors);
+	int i,n,t;
+	n = t = 0;
+	for (i = 0; i < ysource; i++)
+	{
+		memcpy(pixmap+(n * xsource * colors),pixmap_tmp+(i * xsource * colors), xsource * colors);
+		n++;
+		if (t == (ysource/(ydest-ysource))-1) 
+		{
+			memcpy(pixmap+(n * xsource * colors),pixmap_tmp+(i * xsource * colors), xsource * colors);
+			n++;
+			t = 0;
+		} else
+			t++;
 	}
 	free(pixmap_tmp);
 }
