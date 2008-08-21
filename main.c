@@ -1387,7 +1387,7 @@ send_message:
 				{
 					/* Some status information like video aspect and video scale permissions do
 					 * not change inside a VTS. Therefore we will set it new at this place */
-					ddvd_play_empty(FALSE);//ddvd_play_empty(TRUE);
+					ddvd_play_empty(FALSE);
 					audio_lock = 0;	// reset audio & spu lock
 					spu_lock = 0;
 					audio_format[0] = audio_format[1] = audio_format[2] = audio_format[4] = audio_format[4] = audio_format[5] = audio_format[6] = audio_format[7] = -1;
@@ -2213,8 +2213,6 @@ static void ddvd_play_empty(int device_clear)
 // Empty Device Buffers
 static void ddvd_device_clear(void)
 {
-	if (ioctl(ddvd_fdaudio, AUDIO_STOP) < 0)
-		perror("AUDIO_STOP");
 	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
 		perror("AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
