@@ -2365,11 +2365,11 @@ static int ddvd_spu_decode_data(const uint8_t * buffer, int len)
 		len = code >> 2;
 
 		if (len == 0)
-			len = x2spu - xspu;
+			len = (x2spu - xspu) + 1;
 
 		memset(ddvd_lbb + xspu + ddvd_screeninfo_xres * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
 		xspu += len;
-		if (xspu >= x2spu) {
+		if (xspu > x2spu) {
 			if (!aligned) {
 				code = (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
 				aligned = aligned ? 0 : 1;
