@@ -1,6 +1,7 @@
 /* 
  * DreamDVD V0.9 - DVD-Player for Dreambox
  * Copyright (C) 2007 by Seddi
+ * Logo designed 2007 by Yvessun
  * 
  * This DVD Player is based upon the great work from the libdvdnav project,
  * a52dec library, ffmpeg and the knowledge from all the people who made 
