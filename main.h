@@ -145,7 +145,7 @@ uint64_t ddvd_spu_timer_end;
 int ddvd_trick_timer_active;
 uint64_t ddvd_trick_timer_end;
 
-unsigned char *ddvd_lbb;
+unsigned char *ddvd_lbb, *ddvd_lbb2;
 int ddvd_output_fd, ddvd_fdvideo, ddvd_fdaudio, ddvd_ac3_fd;
 
 int ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_stride;
@@ -204,7 +204,8 @@ static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
-void 				ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
-void				ddvd_resize_pixmap_simple(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
+void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
+void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
+void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
 
 #endif

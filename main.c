@@ -377,6 +377,11 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int msg;
 	// try to load liba52.so.0 for softdecoding
 	int have_liba52 = ddvd_load_liba52();
+	
+	if (ddvd_screeninfo_bypp == 1)
+		ddvd_resize_pixmap = &ddvd_resize_pixmap_1bpp;
+	else
+		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp;
 
 	uint8_t *last_iframe = NULL;
 	uint8_t *spu_buffer = NULL;
@@ -389,7 +394,13 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
-
+	ddvd_lbb2 = malloc(ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp);
+	if (ddvd_lbb2 == NULL) {
+		perror("SPU-Backbuffer <mem allocation failed>");
+		res = DDVD_NOMEM;
+		goto err_malloc;
+	}
+	
 	last_iframe = malloc(320 * 1024);
 	if (last_iframe == NULL) {
 		perror("malloc");
@@ -1320,15 +1331,15 @@ send_message:
 							msg = DDVD_NULL;
 							//CHANGE COLORMAP
 
-							memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
+							memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 							//copy button into screen
 							for (i = btni->y_start; i < btni->y_end; i++) {
 								if (ddvd_screeninfo_bypp == 1)
-									memcpy(p_lfb + btni->x_start + ddvd_screeninfo_xres * (i),
+									memcpy(ddvd_lbb2 + btni->x_start + ddvd_screeninfo_xres * (i),
 									       ddvd_lbb + btni->x_start + ddvd_screeninfo_xres * (i),
 									       btni->x_end - btni->x_start);
 								else
-									ddvd_blit_to_argb(p_lfb + btni->x_start * ddvd_screeninfo_bypp +
+									ddvd_blit_to_argb(ddvd_lbb2 + btni->x_start * ddvd_screeninfo_bypp +
 											  ddvd_screeninfo_stride * i,
 											  ddvd_lbb + btni->x_start + ddvd_screeninfo_xres * (i),
 											  btni->x_end - btni->x_start);
@@ -1358,27 +1369,26 @@ send_message:
 						msg = DDVD_NULL;
 						//CHANGE COLORMAP
 
-						memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
+						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 						//copy button into screen
 						for (i = hl.sy; i < hl.ey; i++) {
 							if (ddvd_screeninfo_bypp == 1)
-								memcpy(p_lfb + hl.sx + ddvd_screeninfo_xres * (i),
+								memcpy(ddvd_lbb2 + hl.sx + ddvd_screeninfo_xres * (i),
 								       ddvd_lbb + hl.sx + ddvd_screeninfo_xres * (i), hl.ex - hl.sx);
 							else
-								ddvd_blit_to_argb(p_lfb + hl.sx * ddvd_screeninfo_bypp + ddvd_screeninfo_stride * i,
+								ddvd_blit_to_argb(ddvd_lbb2 + hl.sx * ddvd_screeninfo_bypp + ddvd_screeninfo_stride * i,
 										  ddvd_lbb + hl.sx + ddvd_screeninfo_xres * (i), hl.ex - hl.sx);
 						}
 						libdvdnav_workaround = 1;
 					}
 					if (!libdvdnav_workaround)
-						memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen .. 
+						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen .. 
 
-					if (ddvd_have_ntsc == 1) {
-						if (ddvd_screeninfo_bypp == 1)
-							ddvd_resize_pixmap_simple(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
-						else
-							ddvd_resize_pixmap(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
-					}
+					if (ddvd_have_ntsc == 1)
+							ddvd_resize_pixmap(ddvd_lbb2, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
+					
+					memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
+
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 				} else {
@@ -1921,19 +1931,20 @@ key_play:
 		}
 		// spu handling
 		if (ddvd_lbb_changed == 1) {
+
 			if (ddvd_screeninfo_bypp == 1)
-				memcpy(p_lfb, ddvd_lbb, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//copy SPU backbuffer into screen
+				memcpy(ddvd_lbb2, ddvd_lbb, ddvd_screeninfo_xres * ddvd_screeninfo_yres);
 			else {
 				int i = 0;
 				for (; i < ddvd_screeninfo_yres; ++i)
-					ddvd_blit_to_argb(p_lfb + i * ddvd_screeninfo_stride, ddvd_lbb + i * ddvd_screeninfo_xres, ddvd_screeninfo_xres);
+					ddvd_blit_to_argb(ddvd_lbb2 + i * ddvd_screeninfo_stride, ddvd_lbb + i * ddvd_screeninfo_xres, ddvd_screeninfo_xres);
 			}
-			if (ddvd_have_ntsc == 1) {
-				if (ddvd_screeninfo_bypp == 1)
-					ddvd_resize_pixmap_simple(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
-				else
-					ddvd_resize_pixmap(p_lfb, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
-			}
+
+			if (ddvd_have_ntsc == 1)
+					ddvd_resize_pixmap(ddvd_lbb2, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);			
+			
+			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy SPU backbuffer into screen
+						
 			int msg_old = msg;	// save and restore msg it may not bee empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2421,8 +2432,30 @@ static void ddvd_unset_pcr_offset(void)
 
 #endif
 
+// "nearest neighbor" pixmap resizing
+void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
+{
+    int x_ratio = (int)((xsource<<16)/xdest) ;
+    int y_ratio = (int)((ysource<<16)/ydest) ;
+	unsigned char *pixmap_tmp;
+	pixmap_tmp = (unsigned char *)malloc(xsource*ysource*colors);
+	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
+	
+	int x2, y2, c, i ,j;
+    for (i=0;i<ydest;i++) {
+        for (j=0;j<xdest;j++) {
+            x2 = ((j*x_ratio)>>16) ;
+            y2 = ((i*y_ratio)>>16) ;
+            for (c=0; c<colors; c++)
+				pixmap[((i*xdest)+j)*colors + c] = pixmap_tmp[((y2*xsource)+x2)*colors + c] ;
+        }                
+    }   
+	free(pixmap_tmp);
+}
+
+#if 0
 // bicubic picture resize
-void ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
+void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
 {
 	
 	float fx,fy,tmp_f/*,dpixel*/;
@@ -2501,9 +2534,37 @@ void ddvd_resize_pixmap(unsigned char *pixmap, int xsource, int ysource, int xde
 	}
 	free(pixmap_tmp);
 }
+#endif
 
+// very simple linear resize used for 1bypp mode
+void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
+{
+	unsigned char *pixmap_tmp;
+	pixmap_tmp = (unsigned char *)malloc(xsource * ysource * colors);
+	memcpy(pixmap_tmp, pixmap, xsource * ysource * colors);
+	int i, fx, fy, tmp;
+	
+	// precalculate scale factor, use factor 10 to get rid of floats
+	fx=xsource*10/xdest;
+	fy=ysource*10/ydest;
+	
+	// scale x
+	for (i = 0; i < xdest; i++)
+		pixmap[i]=pixmap_tmp[(fx*i)/10];
+
+	// scale y
+	for (i = 0; i < ydest; i++)
+	{
+		tmp=(fy*i)/10;
+		if (tmp != i)
+			memcpy(pixmap + (i*xdest), pixmap + tmp * xdest, xdest);
+	}	
+	free(pixmap_tmp);
+}
+
+#if 0
 // simple linear resize used for 1bypp mode, this routine is only able to upscale yres so dont use it for anything else !
-void ddvd_resize_pixmap_simple(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
+void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
 {
 	unsigned char *pixmap_tmp;
 	pixmap_tmp = (unsigned char *)malloc(xsource * ysource * colors);
@@ -2524,3 +2585,4 @@ void ddvd_resize_pixmap_simple(unsigned char *pixmap, int xsource, int ysource, 
 	}
 	free(pixmap_tmp);
 }
+#endif
