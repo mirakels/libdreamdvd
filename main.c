@@ -856,7 +856,7 @@ send_message:
 #endif
 					// if we have 16:9 Zoom Mode on the DVD and we use a "always 16:9" mode on tv we have
 					// to patch the mpeg header and the Sequence Display Extension inside the Stream in some cases
-					if (dvd_aspect == 3 && tv_aspect == DDVD_16_9 && tv_mode == DDVD_PAN_SCAN) {
+					if (dvd_aspect == 3 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_9) && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) {
 						int z=0;
 						for (z=0; z<2040; z++)
 						{
