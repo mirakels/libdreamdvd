@@ -47,6 +47,7 @@
 #include <netinet/in.h>
 #include <byteswap.h>
 #include <errno.h>
+#include <poll.h>
 
 #include <dvdnav/dvdnav.h>
 #include "ddvdlib.h"
@@ -157,6 +158,7 @@ struct ddvd {
 	/* config options */
 	char language[2]; 				// iso code (de, en, ...)
 	int aspect;						// 0-> 4:3 lb 1-> 4:3 ps 2-> 16:9 3-> always 16:9
+	int tv_mode;					//
 	int tv_system;					// 0-> PAL 1-> NTSC
 	int ac3thru;					// 0-> internal soft decoding 1-> ac3 pass thru to optical out
 	unsigned char *lfb;				// framebuffer to render subtitles and menus
@@ -194,7 +196,7 @@ struct ddvd {
 /* internal functions */
 static struct 		ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig);
 static int 		ddvd_readpipe(int pipefd, void *dest, size_t bytes, int blocked_read);
-static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect);
+static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect, int tv_mode);
 static uint64_t 	ddvd_get_time(void);
 static void 		ddvd_play_empty(int device_clear);
 static void 		ddvd_device_clear(void);
@@ -204,8 +206,9 @@ static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
-void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
-void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
-void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors);
+void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
+void 				ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
+void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
+void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
 
 #endif

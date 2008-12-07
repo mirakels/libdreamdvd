@@ -27,8 +27,6 @@
 #include "mpegaudioenc.h"
 #include "a52dec.h"
 
-#include <poll.h>
-
 /*
  * local helper functions
  */
@@ -124,7 +122,7 @@ struct ddvd *ddvd_create(void)
 	ddvd_set_ac3thru(pconfig, 0);
 	ddvd_set_language(pconfig, "en");
 	ddvd_set_dvd_path(pconfig, "/dev/cdroms/cdrom0");
-	ddvd_set_video(pconfig, DDVD_4_3_LETTERBOX, DDVD_PAL);
+	ddvd_set_video(pconfig, DDVD_4_3, DDVD_LETTERBOX, DDVD_PAL);
 	ddvd_set_lfb(pconfig, NULL, 720, 576, 1, 720);
 	struct ddvd_resume resume_info;
 	resume_info.title=resume_info.chapter=resume_info.block=resume_info.audio_id=resume_info.audio_lock=resume_info.spu_id=resume_info.spu_lock=0;
@@ -214,9 +212,10 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru)
 }
 
 // set video options
-void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_system)
+void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_mode, int tv_system)
 {
 	pconfig->aspect = aspect;
+	pconfig->tv_mode = tv_mode;
 	pconfig->tv_system = tv_system;
 }
 
@@ -378,10 +377,15 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	// try to load liba52.so.0 for softdecoding
 	int have_liba52 = ddvd_load_liba52();
 	
+	// decide which resize routine we should use
+	// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
+	// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
 	if (ddvd_screeninfo_bypp == 1)
 		ddvd_resize_pixmap = &ddvd_resize_pixmap_1bpp;
-	else
+	else if (ddvd_screeninfo_xres > 720)
 		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp;
+	else
+		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp_smooth;
 
 	uint8_t *last_iframe = NULL;
 	uint8_t *spu_buffer = NULL;
@@ -422,7 +426,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		goto err_malloc;
 	}
 
-	memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);
+	memset(ddvd_lbb, 0, 720 * 576);
 	memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen
 
 	msg = DDVD_SCREEN_UPDATE;
@@ -551,6 +555,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	strcpy(osdtext, "");
 
 	int tv_aspect = playerconfig->aspect;	//0-> 4:3 lb 1-> 4:3 ps 2-> 16:9 3-> always 16:9
+	int tv_mode = playerconfig->tv_mode;
 	int dvd_aspect = 0;	//0-> 4:3 2-> 16:9
 	int dvd_scale_perm = 0;
 	int tv_scale = 0;	//0-> off 1-> letterbox 2-> panscan
@@ -581,6 +586,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 			perror("AUDIO_SET_BYPASS_MODE");
 	}
 
+#if CONFIG_API_VERSION == 1	
 	// set video system
 	int pal_ntsc = playerconfig->tv_system;
 	int saa;
@@ -594,7 +600,8 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 			perror("SAAIOSENC");
 		close(saafd);
 	}
-
+#endif
+	
 	/* open dvdnav handle */
 	printf("Opening DVD...%s\n", playerconfig->dvd_path);
 	if (dvdnav_open(&dvdnav, playerconfig->dvd_path) != DVDNAV_STATUS_OK) {
@@ -806,7 +813,7 @@ send_message:
 			if (ddvd_spu_timer_active) {
 				if (ddvd_spu_timer_end <= ddvd_get_time()) {
 					ddvd_spu_timer_active = 0;
-					memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//clear SPU backbuffer
+					memset(ddvd_lbb, 0, 720 * 576);	//clear SPU backbuffer
 					ddvd_lbb_changed = 1;
 					//printf("spu timer done\n");
 				}
@@ -847,9 +854,21 @@ send_message:
 						buf[22] = 0x01;
 					}
 #endif
-					// If DVD Aspect is 16:9 Zoom (3) and TV is 16:9 then patch the mpeg stream
-					// up to 16:9 anamorph because the decoder dont support the 16:9 zoom mode
-					if (dvd_aspect == 3 && tv_aspect >= 2) {
+					// if we have 16:9 Zoom Mode on the DVD and we use a "always 16:9" mode on tv we have
+					// to patch the mpeg header and the Sequence Display Extension inside the Stream in some cases
+					if (dvd_aspect == 3 && tv_aspect == DDVD_16_9 && tv_mode == DDVD_PAN_SCAN) {
+						int z=0;
+						for (z=0; z<2040; z++)
+						{
+							if (buf[z] == 0x0 && buf[z+1] == 0x0 && buf[z+2] ==0x01 && buf[z+3] == 0xB5 && (buf[z+4] == 0x22 || buf[z+4] == 0x23))
+							{
+								buf[z+5]=0x22;
+								buf[z+5]=0x0B;
+								buf[z+6]=0x42;
+								buf[z+7]=0x12;
+								buf[z+8]=0x00;
+							}
+						}
 						if (buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3) {
 							buf[33 + 7] = (buf[33 + 7] & 0xF) + 0x30;
 						}
@@ -857,7 +876,7 @@ send_message:
 							buf[36 + 7] = (buf[36 + 7] & 0xF) + 0x30;
 						}
 					}
-					
+			
 					// check yres for detecting ntsc/pal
 					if (ddvd_have_ntsc == -1) {
 						if ((buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3 && ((buf[33+5] & 0xF) << 8) + buf[33+6] == 0x1E0) 
@@ -1335,13 +1354,13 @@ send_message:
 							//copy button into screen
 							for (i = btni->y_start; i < btni->y_end; i++) {
 								if (ddvd_screeninfo_bypp == 1)
-									memcpy(ddvd_lbb2 + btni->x_start + ddvd_screeninfo_xres * (i),
-									       ddvd_lbb + btni->x_start + ddvd_screeninfo_xres * (i),
+									memcpy(ddvd_lbb2 + btni->x_start + 720 * (i),
+									       ddvd_lbb + btni->x_start + 720 * (i),
 									       btni->x_end - btni->x_start);
 								else
 									ddvd_blit_to_argb(ddvd_lbb2 + btni->x_start * ddvd_screeninfo_bypp +
-											  ddvd_screeninfo_stride * i,
-											  ddvd_lbb + btni->x_start + ddvd_screeninfo_xres * (i),
+											  720 * ddvd_screeninfo_bypp * i,
+											  ddvd_lbb + btni->x_start + 720 * (i),
 											  btni->x_end - btni->x_start);
 							}
 
@@ -1373,20 +1392,21 @@ send_message:
 						//copy button into screen
 						for (i = hl.sy; i < hl.ey; i++) {
 							if (ddvd_screeninfo_bypp == 1)
-								memcpy(ddvd_lbb2 + hl.sx + ddvd_screeninfo_xres * (i),
-								       ddvd_lbb + hl.sx + ddvd_screeninfo_xres * (i), hl.ex - hl.sx);
+								memcpy(ddvd_lbb2 + hl.sx + 720 * (i),
+								       ddvd_lbb + hl.sx + 720 * (i), hl.ex - hl.sx);
 							else
-								ddvd_blit_to_argb(ddvd_lbb2 + hl.sx * ddvd_screeninfo_bypp + ddvd_screeninfo_stride * i,
-										  ddvd_lbb + hl.sx + ddvd_screeninfo_xres * (i), hl.ex - hl.sx);
+								ddvd_blit_to_argb(ddvd_lbb2 + hl.sx * ddvd_screeninfo_bypp + 720 * ddvd_screeninfo_bypp * i,
+										  ddvd_lbb + hl.sx + 720 * (i), hl.ex - hl.sx);
 						}
 						libdvdnav_workaround = 1;
 					}
 					if (!libdvdnav_workaround)
 						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen .. 
 
-					if (ddvd_have_ntsc == 1)
-							ddvd_resize_pixmap(ddvd_lbb2, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);
-					
+					int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
+					int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
+					int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
+					ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
 					memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 
 					msg = DDVD_SCREEN_UPDATE;
@@ -1408,7 +1428,7 @@ send_message:
 
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
-					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect);
+					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect, tv_mode);
 					//printf("DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n",dvd_aspect,tv_aspect,tv_scale,dvd_scale_perm);
 					
 					// resuming a dvd ?
@@ -1542,7 +1562,7 @@ send_message:
 		{
 			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 
-			memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//clear backbuffer .. 
+			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer .. 
 			ddvd_display_time = ddvd_spu_decode_data(spu_backbuffer, tmplen);	// decode
 			ddvd_lbb_changed = 1;
 
@@ -1648,7 +1668,7 @@ send_message:
 				case DDVD_KEY_OK:	//OK
 					ddvd_wait_for_user = 0;
 					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
-					memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//clear backbuffer
+					memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 					ddvd_clear_buttons = 1;
@@ -1931,25 +1951,25 @@ key_play:
 		}
 		// spu handling
 		if (ddvd_lbb_changed == 1) {
-
+			
 			if (ddvd_screeninfo_bypp == 1)
-				memcpy(ddvd_lbb2, ddvd_lbb, ddvd_screeninfo_xres * ddvd_screeninfo_yres);
+				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
 			else {
 				int i = 0;
-				for (; i < ddvd_screeninfo_yres; ++i)
-					ddvd_blit_to_argb(ddvd_lbb2 + i * ddvd_screeninfo_stride, ddvd_lbb + i * ddvd_screeninfo_xres, ddvd_screeninfo_xres);
+				for (; i < 576; ++i)
+					ddvd_blit_to_argb(ddvd_lbb2 + i * 720 * ddvd_screeninfo_bypp, ddvd_lbb + i * 720, 720);
 			}
-
-			if (ddvd_have_ntsc == 1)
-					ddvd_resize_pixmap(ddvd_lbb2, ddvd_screeninfo_xres, 480, ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_bypp);			
+			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
+			int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
+			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
+			ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
+			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 			
-			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy SPU backbuffer into screen
-						
 			int msg_old = msg;	// save and restore msg it may not bee empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
 			msg = msg_old;
-			ddvd_lbb_changed = 0;
+			ddvd_lbb_changed = 0;		
 		}
 		// report audio info
 		if (report_audio_info) { 
@@ -2099,91 +2119,20 @@ static struct ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig)
 }
 
 // video out aspect/scale
-static int ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect)
+static int ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect, int tv_mode)
 {
-	const char *aspect = NULL, *policy = NULL, *policy2 = NULL, *saa2 = NULL;
-	int tv_scale = 0;
-	int saa;
+	int tv_scale = 0; // widescreen spu
 
-	if (tv_aspect == 2)	// tv 16:9
+	if (dvd_aspect == 0) // dvd 4:3
 	{
-		if (dvd_aspect == 0) {
-			aspect = "4:3";
-			policy = "VIDEO_PAN_SCAN";	//no scaling needed
-			policy2 = "panscan";
-			tv_scale = 0;	//off
-			saa = SAA_WSS_43F;
-			saa2 = "4:3_full_format";
-		} else {
-			aspect = "16:9";
-			policy = "VIDEO_CENTER_CUT_OUT";	//no scaling needed
-			policy2 = "bestfit";
-			tv_scale = 0;	//off
-			saa = SAA_WSS_169F;
-			saa2 = "16:9_full_format";
-		}
-	} else if (tv_aspect == 3)	// tv always 16:9
-	{
-		aspect = "16:9";
-		policy = "VIDEO_CENTER_CUT_OUT";	//no scaling needed
-		policy2 = "panscan";
-		tv_scale = 0;	//off
-		saa = SAA_WSS_169F;
-		saa2 = "16:9_full_format";
-	} else			// tv 4:3
-	{
-		aspect = "4:3";
-		saa = SAA_WSS_43F;
-		saa2 = "4:3_full_format";
-		if (dvd_aspect == 0)	// dvd 4:3 ...
-		{
-			policy = "VIDEO_PAN_SCAN";	//no scaling needed
-			policy2 = "panscan";
-			tv_scale = 0;	//off
-		} else		// dvd 16:9 ... need scaling prefer letterbox (tv_aspect 0)
-		{
-			if (!(dvd_scale_perm & 1))	// letterbox allowed
-			{
-				policy = "VIDEO_LETTER_BOX";
-				policy2 = "letterbox";
-				tv_scale = 1;	//letterbox
-			} else if (!(dvd_scale_perm & 2))	// panscan allowed
-			{
-				policy = "VIDEO_PAN_SCAN";
-				policy2 = "panscan";
-				tv_scale = 2;	//panscan
-			} else	// should not happen
-			{
-				policy = "VIDEO_LETTER_BOX";
-				policy2 = "letterbox";
-				tv_scale = 1;	//off
-			}
-		}
-		if (tv_aspect == 1 && tv_scale == 1 && !(dvd_scale_perm & 2))	// prefer panscan if allowed (tv_aspect 1)
-		{
-			policy = "VIDEO_PAN_SCAN";
-			policy2 = "panscan";
-			tv_scale = 2;	//panscan
-		}
-	}
-
-	if (ioctl(ddvd_fdvideo, VIDEO_SET_DISPLAY_FORMAT, policy) < 0)
-		perror("VIDEO_SET_DISPLAY_FORMAT");
-
-	int saafd = open("/dev/dbox/saa0", O_RDWR);
-	if (saafd >= 0) {
-		if (ioctl(saafd, SAAIOSWSS, &saa) < 0)
-			perror("SAAIOSWSS");
-		close(saafd);
-	}
-
-	// switch video aspect
-	write_string("/proc/stb/video/aspect", aspect);
-	// switch video scaling
-	write_string("/proc/stb/video/policy", policy2);
-	// switch wss
-	write_string("/proc/stb/denc/0/wss", saa2);
-
+		if((tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX))
+			tv_scale = 2; // pan_scan spu
+		if (tv_aspect == DDVD_4_3 && tv_mode == DDVD_PAN_SCAN)
+			tv_scale = 2; // pan_scan spu
+		if (tv_aspect == DDVD_4_3 && tv_mode == DDVD_LETTERBOX)
+			tv_scale = 1; // letterbox spu
+	} 
+	
 	return tv_scale;
 }
 
@@ -2221,9 +2170,6 @@ static void ddvd_play_empty(int device_clear)
 
 	ddvd_spu_timer_active = 0;
 	ddvd_spu_timer_end = 0;
-
-	//memset(ddvd_lbb, 0, ddvd_screeninfo_xres*ddvd_screeninfo_yres); //clear SPU backbuffer
-	//ddvd_lbb_changed=1;
 
 	if (device_clear)
 		ddvd_device_clear();
@@ -2267,7 +2213,7 @@ static int ddvd_spu_decode_data(const uint8_t * buffer, int len)
 		switch (buffer[i]) {
 		case 0x00:	/* menu button special color handling */
 			menubutton = 1;
-			memset(ddvd_lbb, 0, ddvd_screeninfo_xres * ddvd_screeninfo_yres);	//clear backbuffer
+			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
 			i++;
 			break;
 		case 0x01:	/* show */
@@ -2378,7 +2324,7 @@ static int ddvd_spu_decode_data(const uint8_t * buffer, int len)
 		if (len == 0)
 			len = (x2spu - xspu) + 1;
 
-		memset(ddvd_lbb + xspu + ddvd_screeninfo_xres * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
+		memset(ddvd_lbb + xspu + 720 * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
 		xspu += len;
 		if (xspu > x2spu) {
 			if (!aligned) {
@@ -2432,30 +2378,31 @@ static void ddvd_unset_pcr_offset(void)
 
 #endif
 
+
 // "nearest neighbor" pixmap resizing
-void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
+void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors)
 {
-    int x_ratio = (int)((xsource<<16)/xdest) ;
-    int y_ratio = (int)((ysource<<16)/ydest) ;
+    int x_ratio = (int)((xsource<<16)/(xdest-2*xoffset)) ;
+    int y_ratio = (int)(((ysource-2*yoffset)<<16)/ydest) ;
 	unsigned char *pixmap_tmp;
 	pixmap_tmp = (unsigned char *)malloc(xsource*ysource*colors);
 	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
+	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	
 	int x2, y2, c, i ,j;
     for (i=0;i<ydest;i++) {
-        for (j=0;j<xdest;j++) {
+        for (j=0;j<(xdest-2*xoffset);j++) {
             x2 = ((j*x_ratio)>>16) ;
-            y2 = ((i*y_ratio)>>16) ;
+            y2 = ((i*y_ratio)>>16)+yoffset ;
             for (c=0; c<colors; c++)
-				pixmap[((i*xdest)+j)*colors + c] = pixmap_tmp[((y2*xsource)+x2)*colors + c] ;
+				pixmap[((i*xdest)+j)*colors + c + xoffset*colors] = pixmap_tmp[((y2*xsource)+x2)*colors + c] ;
         }                
     }   
 	free(pixmap_tmp);
 }
 
-#if 0
 // bicubic picture resize
-void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors)
+void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors)
 {
 	
 	float fx,fy,tmp_f/*,dpixel*/;
@@ -2463,12 +2410,13 @@ void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, in
 	unsigned int c,tmp_i;
 	int x,y,t,t1;
 	xs=xsource; // x-resolution source
-	ys=ysource; // y-resolution source
-	xd=xdest; // x-resolution destination
+	ys=ysource-2*yoffset; // y-resolution source
+	xd=xdest-2*xoffset; // x-resolution destination
 	yd=ydest; // y-resolution destination
 	unsigned char *pixmap_tmp;
 	pixmap_tmp = (unsigned char *)malloc(xsource*ysource*colors);
 	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
+	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	
 	// get x scale factor
 	fx=(float)(xs-1)/(float)xd;
@@ -2517,7 +2465,7 @@ void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, in
 				{
 					for (t=sx1[x]; t<=sx2[x]; t++) 
 					{
-						tmp_i+=(int)pixmap_tmp[(t*colors)+c+(t1*xs*colors)];
+						tmp_i+=(int)pixmap_tmp[(t*colors)+c+((t1+yoffset)*xs*colors)];
 						dpixel++;		
 					}
 				}
@@ -2528,61 +2476,38 @@ void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, in
 				tmp_i=tmp_i/dpixel; // working with integers is not correct, but much faster and +-1 inside the color values doesnt really matter
 				
 				// writing calculated pixel into destination pixmap
-				pixmap[(x*colors)+c+(y*xd*colors)]=tmp_i;
+				pixmap[((x+xoffset)*colors)+c+(y*(xd+2*xoffset)*colors)]=tmp_i;
 			}
 		}
 	}
 	free(pixmap_tmp);
 }
-#endif
+
 
 // very simple linear resize used for 1bypp mode
-void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
+void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors) 
 {
 	unsigned char *pixmap_tmp;
 	pixmap_tmp = (unsigned char *)malloc(xsource * ysource * colors);
 	memcpy(pixmap_tmp, pixmap, xsource * ysource * colors);
+	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	int i, fx, fy, tmp;
 	
 	// precalculate scale factor, use factor 10 to get rid of floats
-	fx=xsource*10/xdest;
-	fy=ysource*10/ydest;
+	fx=xsource*10/(xdest-2*xoffset);
+	fy=(ysource-2*yoffset)*10/ydest;
 	
 	// scale x
-	for (i = 0; i < xdest; i++)
-		pixmap[i]=pixmap_tmp[(fx*i)/10];
+	for (i = 0; i < (xdest-2*xoffset); i++)
+		pixmap[i]=pixmap_tmp[((fx*i)/10)+xoffset];
 
 	// scale y
 	for (i = 0; i < ydest; i++)
 	{
 		tmp=(fy*i)/10;
 		if (tmp != i)
-			memcpy(pixmap + (i*xdest), pixmap + tmp * xdest, xdest);
+			memcpy(pixmap + (i*xdest), pixmap + (tmp + yoffset) * xdest, xdest);
 	}	
 	free(pixmap_tmp);
 }
 
-#if 0
-// simple linear resize used for 1bypp mode, this routine is only able to upscale yres so dont use it for anything else !
-void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int colors) 
-{
-	unsigned char *pixmap_tmp;
-	pixmap_tmp = (unsigned char *)malloc(xsource * ysource * colors);
-	memcpy(pixmap_tmp, pixmap, xsource * ysource * colors);
-	int i,n,t;
-	n = t = 0;
-	for (i = 0; i < ysource; i++)
-	{
-		memcpy(pixmap+(n * xsource * colors),pixmap_tmp+(i * xsource * colors), xsource * colors);
-		n++;
-		if (t == (ysource/(ydest-ysource))-1) 
-		{
-			memcpy(pixmap+(n * xsource * colors),pixmap_tmp+(i * xsource * colors), xsource * colors);
-			n++;
-			t = 0;
-		} else
-			t++;
-	}
-	free(pixmap_tmp);
-}
-#endif

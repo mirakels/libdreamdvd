@@ -63,9 +63,9 @@ int ddvd_get_messagepipe_fd(struct ddvd *pconfig);
 // set framebuffer and options libdreamdvd should render buttons and subtitles
 // until this option ist set, ddvd_run will not start playing
 // lfb-> needs a pointer to the real framebuffer or to a backbuffer
-// xres, yres-> screen resolution, normally 720x576 libdreamdvd will NOT scale inside 
+// xres, yres-> screen resolution, normally 720x576 libdreamdvd will scale inside to the given resolution
 // bypp-> bytes per pixel, only 1 (8bit) or 4 (32bit argb) is supported
-// stride-> line length in bytes, normally xres*bypp but not always like on the DM7025
+// stride-> line length in bytes, normally xres*bypp but not always like on the DM7025 framebuffer
 void ddvd_set_lfb(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride);
 
 // set path to a dvd block device, a dvd file structure or an dvd iso-file ("/dev/dvd" ...)
@@ -80,7 +80,7 @@ void ddvd_set_language(struct ddvd *pconfig, const char lang[2]);
 void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru);
 
 // set video options for aspect and the tv system, see enums for possible options
-void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_system);
+void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_mode, int tv_system);
 
 // set resume postion for dvd start
 void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info);
@@ -249,10 +249,15 @@ enum { // tv system
 };
 
 enum { // aspect
-	DDVD_4_3_LETTERBOX,
-	DDVD_4_3_PAN_SCAN,
+	DDVD_4_3,
 	DDVD_16_9,
-	DDVD_16_9_ALWAYS,
+	DDVD_16_10,
+};
+
+enum { // tv mode
+	DDVD_LETTERBOX,
+	DDVD_PAN_SCAN,
+	DDVD_JUSTSCALE,
 };
 
 
