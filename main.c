@@ -381,11 +381,14 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
 	// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
 	if (ddvd_screeninfo_bypp == 1)
-		ddvd_resize_pixmap = &ddvd_resize_pixmap_1bpp;
+		ddvd_resize_pixmap = ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_1bpp;
 	else if (ddvd_screeninfo_xres > 720)
-		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp;
+		ddvd_resize_pixmap = ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_xbpp;
 	else
-		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp_smooth;
+	{
+		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp;
+		ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_xbpp_smooth;
+	}
 
 	uint8_t *last_iframe = NULL;
 	uint8_t *spu_buffer = NULL;
@@ -1406,9 +1409,11 @@ send_message:
 					int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 					int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 					int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
-					ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
+					uint64_t start=ddvd_get_time();
+					if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
+						ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
 					memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-
+					printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 				} else {
@@ -1962,9 +1967,11 @@ key_play:
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
-			ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
+			uint64_t start=ddvd_get_time();
+			if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
+				ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, ddvd_screeninfo_bypp); // resize
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-			
+			printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 			int msg_old = msg;	// save and restore msg it may not bee empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2404,9 +2411,7 @@ void ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, in
 // bicubic picture resize
 void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors)
 {
-	
-	float fx,fy,tmp_f/*,dpixel*/;
-	unsigned int xs,ys,xd,yd,dpixel;
+	unsigned int xs,ys,xd,yd,dpixel,fx,fy;
 	unsigned int c,tmp_i;
 	int x,y,t,t1;
 	xs=xsource; // x-resolution source
@@ -2418,11 +2423,11 @@ void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysou
 	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
 	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	
-	// get x scale factor
-	fx=(float)(xs-1)/(float)xd;
+	// get x scale factor, use bitshifting to get rid of floats
+	fx=((xs-1)<<16)/xd;
 
-	// get y scale factor
-	fy=(float)(ys-1)/(float)yd;
+	// get y scale factor, use bitshifting to get rid of floats
+	fy=((ys-1)<<16)/yd;
 
 	unsigned int sx1[xd],sx2[xd],sy1,sy2;
 	
@@ -2430,13 +2435,12 @@ void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysou
 	for (x=0; x<xd; x++) 
 	{
 		// first x source pixel for calculating destination pixel
-		tmp_f=fx*(float)x;
-		sx1[x]=(int)tmp_f; //floor()
+		sx1[x]=(fx*x)>>16; //floor()
 
 		// last x source pixel for calculating destination pixel
-		tmp_f=(float)sx1[x]+fx;
-		sx2[x]=(int)tmp_f;
-		if ((float)sx2[x] < tmp_f) {sx2[x]+=1;} //ceil()		
+		sx2[x]=sx1[x]+(fx>>16);
+		if (fx & 0x7FFF) //ceil()
+			sx2[x]++;
 	}
 	
 	// Scale
@@ -2444,23 +2448,21 @@ void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysou
 	{
 
 		// first y source pixel for calculating destination pixel
-		tmp_f=fy*(float)y;
-		sy1=(int)tmp_f; //floor()
+		sy1=(fy*y)>>16; //floor()
 
 		// last y source pixel for calculating destination pixel
-		tmp_f=(float)sy1+fy;
-		sy2=(int)tmp_f;
-		if ((float)sy2 < tmp_f) {sy2+=1;} //ceil()	
+		sy2=sy1+(fy>>16);
+		if (fy & 0x7FFF) //ceil()
+			sy2++;
 
 		for (x=0; x<xd; x++) 
 		{
 			// we do this for every color
 			for (c=0; c<colors; c++) 
 			{
-				// calculationg destination pixel
+				// calculating destination pixel
 				tmp_i=0;
 				dpixel=0;
-		
 				for (t1=sy1; t1<sy2; t1++) 
 				{
 					for (t=sx1[x]; t<=sx2[x]; t++) 
@@ -2469,20 +2471,13 @@ void ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysou
 						dpixel++;		
 					}
 				}
-		
-				//tmp_f=(float)tmp_i/dpixel;
-				//tmp_i=(int)tmp_f;
-				//if ((float)tmp_i+0.5 <= tmp_f) {tmp_i+=1;} //round()
-				tmp_i=tmp_i/dpixel; // working with integers is not correct, but much faster and +-1 inside the color values doesnt really matter
-				
 				// writing calculated pixel into destination pixmap
-				pixmap[((x+xoffset)*colors)+c+(y*(xd+2*xoffset)*colors)]=tmp_i;
+				pixmap[((x+xoffset)*colors)+c+(y*(xd+2*xoffset)*colors)]=tmp_i/dpixel;
 			}
 		}
 	}
 	free(pixmap_tmp);
 }
-
 
 // very simple linear resize used for 1bypp mode
 void ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors) 

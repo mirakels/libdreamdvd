@@ -210,5 +210,6 @@ void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource
 void 				ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
 void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
 void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
+void				(*ddvd_resize_pixmap_spu)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
 
 #endif
