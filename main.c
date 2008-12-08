@@ -1283,6 +1283,7 @@ send_message:
 					spu_active_id = ev->physical_wide;
 					break;
 				}	
+				spu_active_id&=0x1F;
 				uint16_t spu_lang = 0xFFFF;
 				int spu_id_logical;
 				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
