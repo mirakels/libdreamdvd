@@ -1331,22 +1331,23 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Lets display some Buttons */
+					
+				blit_area.x_start = last_spu_return.x_start;
+				blit_area.x_end = last_spu_return.x_end;
+				blit_area.y_start = last_spu_return.y_start;
+				blit_area.y_end = last_spu_return.y_end;
+				
+				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
+				msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+				
 				if (ddvd_clear_buttons == 0) {
 					dvdnav_highlight_event_t *highlight_event = (dvdnav_highlight_event_t *) buf;
 
 					pci = dvdnav_get_current_nav_pci(dvdnav);
 					dsi = dvdnav_get_current_nav_dsi(dvdnav);
 					dvdnav_highlight_area_t hl;
-					
-					blit_area.x_start = last_spu_return.x_start;
-					blit_area.x_end = last_spu_return.x_end;
-					blit_area.y_start = last_spu_return.y_start;
-					blit_area.y_end = last_spu_return.y_end;
-					
-					memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
-					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
-					safe_write(message_pipe, &msg, sizeof(int));
-					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
 					
 					//struct ddvd_resize_return blit_area;
 					blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
