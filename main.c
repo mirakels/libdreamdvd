@@ -1338,6 +1338,16 @@ send_message:
 					dsi = dvdnav_get_current_nav_dsi(dvdnav);
 					dvdnav_highlight_area_t hl;
 					
+					blit_area.x_start = last_spu_return.x_start;
+					blit_area.x_end = last_spu_return.x_end;
+					blit_area.y_start = last_spu_return.y_start;
+					blit_area.y_end = last_spu_return.y_end;
+					
+					memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
+					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
+					safe_write(message_pipe, &msg, sizeof(int));
+					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+					
 					//struct ddvd_resize_return blit_area;
 					blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
 						
@@ -1440,6 +1450,10 @@ send_message:
 						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
 					else
 					{
+						last_spu_return.x_start = blit_area.x_start; // save rect for wiping next time
+						last_spu_return.x_end = blit_area.x_end;
+						last_spu_return.y_start = blit_area.y_start;
+						last_spu_return.y_end = blit_area.y_end;
 						int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 						int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 						int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
@@ -1712,8 +1726,13 @@ send_message:
 					ddvd_wait_for_user = 0;
 					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 					memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
-					//msg = DDVD_SCREEN_UPDATE;
-					//safe_write(message_pipe, &msg, sizeof(int));
+					blit_area.x_start = blit_area.y_start = 0;
+					blit_area.x_end = ddvd_screeninfo_xres;
+					blit_area.y_end = ddvd_screeninfo_yres;
+					msg = DDVD_SCREEN_UPDATE;
+					safe_write(message_pipe, &msg, sizeof(int));
+					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+					
 					ddvd_clear_buttons = 1;
 					dvdnav_button_activate(dvdnav, pci);
 					ddvd_play_empty(TRUE);
