@@ -115,6 +115,14 @@ typedef struct ddvd_spudec_clut_struct {
 #endif
 } ddvd_spudec_clut_t;
 
+struct ddvd_spu_return {
+	int display_time;
+	int x_start;
+	int x_end;
+	int y_start;
+	int y_end;
+};
+
 // some global stuff 
 
 dvdnav_t *dvdnav;
@@ -200,16 +208,16 @@ static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect
 static uint64_t 	ddvd_get_time(void);
 static void 		ddvd_play_empty(int device_clear);
 static void 		ddvd_device_clear(void);
-static int 		ddvd_spu_decode_data(const uint8_t * buffer, int len);
+static struct 		ddvd_spu_return	ddvd_spu_decode_data(const uint8_t * buffer, int len);
 static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 #if CONFIG_API_VERSION == 3
 static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
-void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
-void 				ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
-void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
-void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
-void				(*ddvd_resize_pixmap_spu)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int colors);
+void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+void 				ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+void				(*ddvd_resize_pixmap_spu)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
 
 #endif
