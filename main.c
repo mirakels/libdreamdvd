@@ -1341,7 +1341,7 @@ send_message:
 					dvdnav_highlight_area_t hl;
 					
 					memcpy(&blit_area,&last_blit_area,sizeof(struct ddvd_resize_return));
-					memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
+					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
 					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
@@ -2598,7 +2598,7 @@ struct ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xso
 	
 	// scale x
 	for (i = return_code.x_start; i < return_code.x_end; i++)
-		pixmap[i]=pixmap_tmp[((fx*i)/10)+xoffset];
+		pixmap[i+xoffset]=pixmap_tmp[((fx*i)/10)];
 
 	// scale y
 	for (i = return_code.y_start; i < return_code.y_end; i++)
