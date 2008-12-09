@@ -2490,6 +2490,9 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xso
     }   
 	free(pixmap_tmp);
 	
+	return_code.x_start+=xoffset; // correct xoffset
+	return_code.x_end+=xoffset;
+	
 	return return_code;
 }
 
@@ -2571,6 +2574,9 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 	}
 	free(pixmap_tmp);
 	
+	return_code.x_start+=xoffset; // correct xoffset
+	return_code.x_end+=xoffset;
+	
 	return return_code;
 }
 
@@ -2606,6 +2612,9 @@ struct ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xso
 			memcpy(pixmap + (i*xdest), pixmap + (tmp + yoffset) * xdest, xdest);
 	}	
 	free(pixmap_tmp);
+	
+	return_code.x_start+=xoffset; // correct xoffset
+	return_code.x_end+=xoffset;
 	
 	return return_code;
 }
