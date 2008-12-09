@@ -123,6 +123,13 @@ struct ddvd_spu_return {
 	int y_end;
 };
 
+struct ddvd_resize_return {
+	int x_start;
+	int x_end;
+	int y_start;
+	int y_end;	
+};
+
 // some global stuff 
 
 dvdnav_t *dvdnav;
@@ -165,8 +172,8 @@ unsigned short ddvd_rd[256],ddvd_gn[256],ddvd_bl[256],ddvd_tr[256];
 struct ddvd {
 	/* config options */
 	char language[2]; 				// iso code (de, en, ...)
-	int aspect;						// 0-> 4:3 lb 1-> 4:3 ps 2-> 16:9 3-> always 16:9
-	int tv_mode;					//
+	int aspect;						// 0-> 4:3 1-> 16:9 2-> 16:10
+	int tv_mode;					// 0-> letterbox 1-> pan_scan 2-> justscale
 	int tv_system;					// 0-> PAL 1-> NTSC
 	int ac3thru;					// 0-> internal soft decoding 1-> ac3 pass thru to optical out
 	unsigned char *lfb;				// framebuffer to render subtitles and menus
@@ -199,6 +206,7 @@ struct ddvd {
 	int resume_spu_id;
 	int resume_spu_lock;
 	int should_resume;
+	struct ddvd_resize_return blit_area;
 };
 
 /* internal functions */
@@ -214,10 +222,10 @@ static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 static void 		ddvd_set_pcr_offset(void);
 static void 		ddvd_unset_pcr_offset(void);
 #endif
-void 				ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-void 				ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-void				ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-void				(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-void				(*ddvd_resize_pixmap_spu)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct 				ddvd_resize_return ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct 				ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct				ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct				ddvd_resize_return (*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct				ddvd_resize_return (*ddvd_resize_pixmap_spu)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
 
 #endif

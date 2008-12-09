@@ -121,6 +121,9 @@ int ddvd_get_next_message(struct ddvd*pconfig, int blocked);
 // struct ddvd_color colortable[4] 
 void ddvd_get_last_colortable(struct ddvd*pconfig, void *colortable);
 
+// get last area to update overlay after DDVD_SCREEN_UPDATE
+void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int *y_start, int *y_end);
+
 // get last received playing time
 // struct ddvd_time timestamp
 void ddvd_get_last_time(struct ddvd*pconfig, void *timestamp);
@@ -172,6 +175,7 @@ enum { // state
 								// ATTENTION to clear screen, libdreamdvd uses color 0, so be sure to set color 0 in the host-application to full transparency
 	DDVD_SCREEN_UPDATE,			// libdreamdvd rendered something to the given framebuffer, so if we are working with a backbuffer in the host app,
 								// we have to update our screen. can be ignored if libdreamdvd renders directly to the real framebuffer
+								// the rect that have to be updated can be fetched with ddvd_get_last_blit_area
 	DDVD_SHOWOSD_STATE_PLAY,	// we should display a state icon or text (play, pause, ...) on osd 
 	DDVD_SHOWOSD_STATE_PAUSE,
 	DDVD_SHOWOSD_TIME, 			// we should display the playing time on osd you can get the time with ddvd_get_last_time
