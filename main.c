@@ -586,6 +586,8 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int audio_id;
 	int report_audio_info = 0;
 	struct ddvd_spu_return last_spu_return;
+	struct ddvd_resize_return last_blit_area;
+	memcpy(&last_blit_area,&blit_area,sizeof(struct ddvd_resize_return));
 
 	ddvd_trickmode = TOFF;
 	ddvd_trickspeed = 0;
@@ -1331,23 +1333,19 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Lets display some Buttons */
-					
-				blit_area.x_start = last_spu_return.x_start;
-				blit_area.x_end = last_spu_return.x_end;
-				blit_area.y_start = last_spu_return.y_start;
-				blit_area.y_end = last_spu_return.y_end;
-				
-				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
-				msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
-				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-				
 				if (ddvd_clear_buttons == 0) {
 					dvdnav_highlight_event_t *highlight_event = (dvdnav_highlight_event_t *) buf;
 
 					pci = dvdnav_get_current_nav_pci(dvdnav);
 					dsi = dvdnav_get_current_nav_dsi(dvdnav);
 					dvdnav_highlight_area_t hl;
+					
+					memcpy(&blit_area,&last_blit_area,sizeof(struct ddvd_resize_return));
+					memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
+					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
+					safe_write(message_pipe, &msg, sizeof(int));
+					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+					//printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 					
 					//struct ddvd_resize_return blit_area;
 					blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
@@ -1451,10 +1449,6 @@ send_message:
 						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer .. 
 					else
 					{
-						last_spu_return.x_start = blit_area.x_start; // save rect for wiping next time
-						last_spu_return.x_end = blit_area.x_end;
-						last_spu_return.y_start = blit_area.y_start;
-						last_spu_return.y_end = blit_area.y_end;
 						int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 						int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 						int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
@@ -1462,11 +1456,12 @@ send_message:
 						if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
 							blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
 						memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-						printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-						printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+						//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
+						//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 						msg = DDVD_SCREEN_UPDATE;
 						safe_write(message_pipe, &msg, sizeof(int));
 						safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+						memcpy(&last_blit_area,&blit_area,sizeof(struct ddvd_resize_return)); // safe blit area for next wipe
 					}
 				} else {
 					ddvd_clear_buttons = 0;
@@ -2034,8 +2029,8 @@ key_play:
 			if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
 				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-			printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-			printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
+			//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 			int msg_old = msg;	// save and restore msg it may not be empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
