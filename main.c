@@ -2243,6 +2243,9 @@ static void ddvd_play_empty(int device_clear)
 	ddvd_spu_timer_active = 0;
 	ddvd_spu_timer_end = 0;
 
+	memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
+	ddvd_lbb_changed = 1;
+	
 	if (device_clear)
 		ddvd_device_clear();
 }
