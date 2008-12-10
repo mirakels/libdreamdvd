@@ -588,7 +588,9 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	struct ddvd_spu_return last_spu_return;
 	struct ddvd_resize_return last_blit_area;
 	memcpy(&last_blit_area,&blit_area,sizeof(struct ddvd_resize_return));
-
+	last_spu_return.x_start = last_spu_return.y_start = 0;
+	last_spu_return.x_end = last_spu_return.y_end = 0;
+	
 	ddvd_trickmode = TOFF;
 	ddvd_trickspeed = 0;
 
