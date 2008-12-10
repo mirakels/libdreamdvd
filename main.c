@@ -2110,6 +2110,8 @@ err_malloc:
 	// clean up
 	if (ddvd_lbb != NULL)
 		free(ddvd_lbb);
+	if (ddvd_lbb2 != NULL)
+		free(ddvd_lbb2);
 	if (last_iframe != NULL)
 		free(last_iframe);
 	if (spu_buffer != NULL)
