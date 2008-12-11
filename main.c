@@ -1347,7 +1347,7 @@ send_message:
 					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-					printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+					//printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 					
 					//struct ddvd_resize_return blit_area;
 					blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
