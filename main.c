@@ -1347,7 +1347,7 @@ send_message:
 					msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-					//printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+					printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 					
 					//struct ddvd_resize_return blit_area;
 					blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
@@ -1453,7 +1453,7 @@ send_message:
 					{
 						int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 						int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
-						int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
+						int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ?  ( ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : (int)(ddvd_screeninfo_yres*1.21 - ddvd_screeninfo_yres)>>1 ) : 0; // correct 16:9 letterbox overlay
 						uint64_t start=ddvd_get_time();
 						if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
 							blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
@@ -2026,7 +2026,7 @@ key_play:
 			blit_area.y_end = last_spu_return.y_end;
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
-			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : 0; // correct 16:9 letterbox overlay
+			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ?  ( ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : (int)(ddvd_screeninfo_yres*1.21 - ddvd_screeninfo_yres)>>1 ) : 0; // correct 16:9 letterbox overlay
 			uint64_t start=ddvd_get_time();
 			if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
 				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
@@ -2469,18 +2469,20 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xso
 {
     int x_ratio = (int)((xsource<<16)/(xdest-2*xoffset)) ;
     int y_ratio = (int)(((ysource-2*yoffset)<<16)/ydest) ;
+	int yoffset2 = (yoffset<<16)/y_ratio;
+	
 	unsigned char *pixmap_tmp;
 	pixmap_tmp = (unsigned char *)malloc(xsource*ysource*colors);
 	memcpy(pixmap_tmp, pixmap, xsource*ysource*colors);
 	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	struct ddvd_resize_return return_code;
 	
-	//printf("%d %d %d %d\n",xstart,xend,ystart,yend);
 	return_code.x_start=(xstart<<16)/x_ratio; // transform input resize area to destination area
 	return_code.x_end=(xend<<16)/x_ratio;
-	return_code.y_start=(ystart<<16)/y_ratio;
-	return_code.y_end=(yend<<16)/y_ratio;
-	//printf("%d %d %d %d\n",xstart,xend,ystart,yend);
+	return_code.y_start=((ystart<<16)/y_ratio)-yoffset2;
+	return_code.y_end=((yend<<16)/y_ratio)-yoffset2;
+	return_code.y_start = return_code.y_start < 0 ? 0 : return_code.y_start;
+	return_code.y_end = return_code.y_end > ydest ? ydest : return_code.y_end;
 	
 	int x2, y2, c, i ,j;
     for (i=return_code.y_start;i<return_code.y_end;i++) {
@@ -2505,6 +2507,7 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 	unsigned int xs,ys,xd,yd,dpixel,fx,fy;
 	unsigned int c,tmp_i;
 	int x,y,t,t1;
+
 	xs=xsource; // x-resolution source
 	ys=ysource-2*yoffset; // y-resolution source
 	xd=xdest-2*xoffset; // x-resolution destination
@@ -2515,12 +2518,13 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 	memset(pixmap, 0, xdest * ydest * colors);	//clear screen ..
 	struct ddvd_resize_return return_code;
 	
-	//printf("%d %d %d %d\n",xstart,xend,ystart,yend);
+	int yoffset2 = (yoffset<<16)/((ys<<16)/yd);
 	return_code.x_start=(xstart<<16)/((xs<<16)/xd); // transform input resize area to destination area
 	return_code.x_end=(xend<<16)/((xs<<16)/xd);
-	return_code.y_start=(ystart<<16)/((ys<<16)/yd);
-	return_code.y_end=(yend<<16)/((ys<<16)/yd);
-	//printf("%d %d %d %d\n",xstart,xend,ystart,yend);
+	return_code.y_start=((ystart<<16)/((ys<<16)/yd))-yoffset2;
+	return_code.y_end=((yend<<16)/((ys<<16)/yd))-yoffset2;
+	return_code.y_start = return_code.y_start < 0 ? 0 : return_code.y_start;
+	return_code.y_end = return_code.y_end > ydest ? ydest : return_code.y_end;
 	
 	// get x scale factor, use bitshifting to get rid of floats
 	fx=((xs-1)<<16)/xd;
@@ -2597,11 +2601,14 @@ struct ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xso
 	// precalculate scale factor, use factor 10 to get rid of floats
 	fx=xsource*10/(xdest-2*xoffset);
 	fy=(ysource-2*yoffset)*10/ydest;
+	int yoffset2 = (yoffset*10)/fy;
 	
-	return_code.x_start=(xstart/10)/fx; // transform input resize area to destination area
-	return_code.x_end=(xend/10)/fx;
-	return_code.y_start=(ystart/10)/fy;
-	return_code.y_end=(yend/10)/fy;
+	return_code.x_start=(xstart*10)/fx; // transform input resize area to destination area
+	return_code.x_end=(xend*10)/fx;
+	return_code.y_start=(ystart*10)/fy;
+	return_code.y_end=(yend*10)/fy;
+	return_code.y_start = return_code.y_start < 0 ? 0 : return_code.y_start;
+	return_code.y_end = return_code.y_end > ydest ? ydest : return_code.y_end;
 	
 	// scale x
 	for (i = return_code.x_start; i < return_code.x_end; i++)
