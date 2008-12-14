@@ -1297,19 +1297,18 @@ send_message:
 				dvdnav_spu_stream_change_event_t *ev = (dvdnav_spu_stream_change_event_t *) buf;
 				switch (tv_scale) {
 				case 0:	//off
-					spu_active_id = ev->physical_wide;
+					spu_active_id = ev->physical_wide & 0x3F;
 					break;
 				case 1:	//letterbox
-					spu_active_id = ev->physical_letterbox;
+					spu_active_id = ev->physical_letterbox & 0x3F;
 					break;
 				case 2:	//panscan
-					spu_active_id = ev->physical_pan_scan;
+					spu_active_id = ev->physical_pan_scan & 0x3F;
 					break;
 				default:	// should not happen
-					spu_active_id = ev->physical_wide;
+					spu_active_id = ev->physical_wide & 0x3F;
 					break;
 				}	
-				spu_active_id&=0x1F;
 				uint16_t spu_lang = 0xFFFF;
 				int spu_id_logical;
 				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
@@ -1531,7 +1530,7 @@ send_message:
 						} else {
 							audio_id = playerconfig->resume_audio_id;
 							audio_lock = 1;//playerconfig->resume_audio_lock;
-							spu_active_id = playerconfig->resume_spu_id & 0x1F;
+							spu_active_id = playerconfig->resume_spu_id;
 							spu_lock = 1;//playerconfig->resume_spu_lock;
 							report_audio_info = 1;
 							uint16_t spu_lang = 0xFFFF;
