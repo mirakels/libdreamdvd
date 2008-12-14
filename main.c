@@ -1297,16 +1297,16 @@ send_message:
 				dvdnav_spu_stream_change_event_t *ev = (dvdnav_spu_stream_change_event_t *) buf;
 				switch (tv_scale) {
 				case 0:	//off
-					spu_active_id = ev->physical_wide & 0x3F;
+					spu_active_id = ev->physical_wide;
 					break;
 				case 1:	//letterbox
-					spu_active_id = ev->physical_letterbox & 0x3F;
+					spu_active_id = ev->physical_letterbox;
 					break;
 				case 2:	//panscan
-					spu_active_id = ev->physical_pan_scan & 0x3F;
+					spu_active_id = ev->physical_pan_scan;
 					break;
 				default:	// should not happen
-					spu_active_id = ev->physical_wide & 0x3F;
+					spu_active_id = ev->physical_wide;
 					break;
 				}	
 				uint16_t spu_lang = 0xFFFF;
@@ -1317,8 +1317,9 @@ send_message:
 					spu_lang = 0x2D2D;	// SPU "off, unknown or maybe menuoverlays" 
 				}							
 				msg = DDVD_SHOWOSD_SUBTITLE;
+				int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
 				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &spu_active_id, sizeof(int));
+				safe_write(message_pipe, &report_spu, sizeof(int));
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 				//printf("SPU Stream change: w %X l: %X p: %X active: %X\n",ev->physical_wide,ev->physical_letterbox,ev->physical_pan_scan,spu_active_id);
 				break;
@@ -1542,8 +1543,9 @@ send_message:
 								spu_active_id = -1;
 							}
 							msg = DDVD_SHOWOSD_SUBTITLE;
+							int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
 							safe_write(message_pipe, &msg, sizeof(int));
-							safe_write(message_pipe, &spu_active_id, sizeof(int));
+							safe_write(message_pipe, &report_spu, sizeof(int));
 							safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
@@ -1941,8 +1943,9 @@ key_play:
 						}
 						spu_lock = 1;
 						msg = DDVD_SHOWOSD_SUBTITLE;
+						int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
 						safe_write(message_pipe, &msg, sizeof(int));
-						safe_write(message_pipe, &spu_active_id, sizeof(int));
+						safe_write(message_pipe, &report_spu, sizeof(int));
 						safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 						break;
 					}
