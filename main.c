@@ -967,9 +967,9 @@ send_message:
 					if ((ddvd_iframerun <= 0x01 || do_copy) && ddvd_still_frame) {
 						if (haveslice)
 							ddvd_iframerun = 0xFF;
-						else if (ddvd_last_iframe_len < (320 * 1024) - (buf[19] + (buf[18] << 8) + 6)) {
-							memcpy(last_iframe + ddvd_last_iframe_len, buf + 14, buf[19] + (buf[18] << 8) + 6);
-							ddvd_last_iframe_len += buf[19] + (buf[18] << 8) + 6;
+						else if (ddvd_last_iframe_len < (320 * 1024) - ((buf[19] + (buf[18] << 8) + 6) - buf[14 + 8])) {
+							memcpy(last_iframe + ddvd_last_iframe_len, buf + 14 + buf[14 + 8] + 3, (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8]);
+							ddvd_last_iframe_len += (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8];
 						}
 					}
 				} else if ((buf[14 + 3]) == 0xC0 + audio_id)	// mpeg audio
