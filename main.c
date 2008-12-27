@@ -544,7 +544,6 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	unsigned char pes_header[] = { 0x00, 0x00, 0x01, 0xE0, 0x00, 0x00, 0x80, 0x00, 0x00 };
 	safe_write(ddvd_output_fd, pes_header, sizeof(pes_header));
 	safe_write(ddvd_output_fd, ddvd_startup_logo, sizeof(ddvd_startup_logo));
-	safe_write(ddvd_output_fd, ddvd_startup_logo, sizeof(ddvd_startup_logo));
 #endif
 #endif
 
@@ -929,15 +928,13 @@ send_message:
 					int haveslice = 0;
 					int setrun = 0;
 
-					while (datalen > 6) {
+					while (datalen > 3) {
 						if (buf[data] == 0 && buf[data + 1] == 0 && buf[data + 2] == 1) {
-							if (buf[data + 3] == 0x00)	//picture
-							{
+							if (buf[data + 3] == 0x00 && datalen > 6) { //picture
 								if (!setrun) {
 									ddvd_iframerun = ((buf[data + 5] >> 3) & 0x07);
 									setrun = 1;
 								}
-
 								if (ddvd_iframerun < 0x01 || 0x03 < ddvd_iframerun) {
 									data++;
 									datalen--;
@@ -947,16 +944,13 @@ send_message:
 								data += 5;
 								datalen -= 5;
 								datalen = 6;
-							} else if (buf[data + 3] == 0xB3 && datalen >= 8)	//sequence header
-							{
+							} else if (buf[data + 3] == 0xB3 && datalen >= 8) { //sequence header
 								ddvd_last_iframe_len = 0;	// clear iframe buffer
 								data += 7;
 								datalen -= 7;
-							} else if (buf[data + 3] == 0xBE)	//padding stream
-							{
+							} else if (buf[data + 3] == 0xBE) { //padding stream
 								break;
-							} else if (0x01 <= buf[data + 3] && buf[data + 3] <= 0xaf)	//slice ?
-							{
+							} else if (0x01 <= buf[data + 3] && buf[data + 3] <= 0xaf) { //slice ?
 								if (!have_pictureheader && ddvd_last_iframe_len == 0)
 									haveslice = 1;
 							}
@@ -968,8 +962,15 @@ send_message:
 						if (haveslice)
 							ddvd_iframerun = 0xFF;
 						else if (ddvd_last_iframe_len < (320 * 1024) - ((buf[19] + (buf[18] << 8) + 6) - buf[14 + 8])) {
-							memcpy(last_iframe + ddvd_last_iframe_len, buf + 14 + buf[14 + 8] + 3, (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8]);
-							ddvd_last_iframe_len += (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8];
+							int len = buf[19] + (buf[18] << 8) + 6;
+							int skip = buf[14+8] + 9; // skip complete pes header
+							len -= skip;
+							if (ddvd_last_iframe_len == 0) { // add simple pes header without pts
+								memcpy(last_iframe, "\x00\x00\x01\xE0\x00\x00\x80\x00\x00", 9);
+								ddvd_last_iframe_len += 9;
+							}
+							memcpy(last_iframe + ddvd_last_iframe_len, buf + 14 + skip, len);
+							ddvd_last_iframe_len += len;
 						}
 					}
 				} else if ((buf[14 + 3]) == 0xC0 + audio_id)	// mpeg audio
