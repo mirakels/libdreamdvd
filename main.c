@@ -1687,6 +1687,10 @@ send_message:
 			dsi = dvdnav_get_current_nav_dsi(dvdnav);
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				dvdnav_get_current_highlight(dvdnav, &buttonN);
+				if (buttonN == 0)
+					buttonN = 1; 
+				if (buttonN > pci->hli.hl_gi.btn_ns)
+					buttonN = pci->hli.hl_gi.btn_ns; 
 				dvdnav_button_select(dvdnav, pci, buttonN);
 				ddvd_lbb_changed = 0;
 				in_menu = 1;
