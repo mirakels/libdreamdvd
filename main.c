@@ -667,6 +667,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int audio_lock = 0;
 	int spu_lock = 0;
 	int audio_format[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+	int spu_map[32] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 	unsigned long long vpts, apts, spts, pts;
 
 	audio_id = dvdnav_get_active_audio_stream(dvdnav);
@@ -851,362 +852,365 @@ send_message:
 			case DVDNAV_BLOCK_OK:
 				/* We have received a regular block of the currently playing MPEG stream.
 				 * So we do some demuxing and decoding. */
+				{
 
-				// collect audio data
-				if (((buf[14 + 3]) & 0xF0) == 0xC0)
-					audio_format[(buf[14 + 3]) - 0xC0] = DDVD_MPEG;
-				if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xF8) == 0x80)
-					audio_format[(buf[14 + buf[14 + 8] + 9]) - 0x80] = DDVD_AC3;
-				if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xF8) == 0x88)
-					audio_format[(buf[14 + buf[14 + 8] + 9]) - 0x88] = DDVD_DTS;
-				if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xF8) == 0xA0)
-					audio_format[(buf[14 + buf[14 + 8] + 9]) - 0xA0] = DDVD_LPCM;
+					// collect audio data
+					int stream_type = buf[14 + buf[14 + 8] + 9];
+					if (((buf[14 + 3]) & 0xF0) == 0xC0)
+						audio_format[(buf[14 + 3]) - 0xC0] = DDVD_MPEG;
+					if ((buf[14 + 3]) == 0xBD && (stream_type & 0xF8) == 0x80)
+						audio_format[stream_type - 0x80] = DDVD_AC3;
+					if ((buf[14 + 3]) == 0xBD && (stream_type & 0xF8) == 0x88)
+						audio_format[stream_type - 0x88] = DDVD_DTS;
+					if ((buf[14 + 3]) == 0xBD && (stream_type & 0xF8) == 0xA0)
+						audio_format[stream_type - 0xA0] = DDVD_LPCM;
 
-				if ((buf[14 + 3] & 0xF0) == 0xE0) {	// video
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-						vpts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						vpts |= buf[14 + 10] << 22;
-						vpts |= (buf[14 + 11] >> 1) << 15;
-						vpts |= buf[14 + 12] << 7;
-						vpts |= (buf[14 + 14] >> 1);
-						//printf("VPTS? %X\n",(int)vpts);
-					}
+					if ((buf[14 + 3] & 0xF0) == 0xE0) {	// video
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+							vpts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							vpts |= buf[14 + 10] << 22;
+							vpts |= (buf[14 + 11] >> 1) << 15;
+							vpts |= buf[14 + 12] << 7;
+							vpts |= (buf[14 + 14] >> 1);
+							//printf("VPTS? %X\n",(int)vpts);
+						}
 #if CONFIG_API_VERSION == 1
-					// Eliminate 00 00 01 B4 sequence error packet because it breaks the pallas mpeg decoder
-					// This is very strange because the 00 00 01 B4 is partly inside the header extension ...
-					if (buf[21] == 0x00 && buf[22] == 0x00 && buf[23] == 0x01 && buf[24] == 0xB4) {
-						buf[21] = 0x01;
-					}
-					if (buf[22] == 0x00 && buf[23] == 0x00 && buf[24] == 0x01 && buf[25] == 0xB4) {
-						buf[22] = 0x01;
-					}
+						// Eliminate 00 00 01 B4 sequence error packet because it breaks the pallas mpeg decoder
+						// This is very strange because the 00 00 01 B4 is partly inside the header extension ...
+						if (buf[21] == 0x00 && buf[22] == 0x00 && buf[23] == 0x01 && buf[24] == 0xB4) {
+							buf[21] = 0x01;
+						}
+						if (buf[22] == 0x00 && buf[23] == 0x00 && buf[24] == 0x01 && buf[25] == 0xB4) {
+							buf[22] = 0x01;
+						}
 #endif
-					// if we have 16:9 Zoom Mode on the DVD and we use a "always 16:9" mode on tv we have
-					// to patch the mpeg header and the Sequence Display Extension inside the Stream in some cases
-					if (dvd_aspect == 3 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_9) && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) {
-						int z=0;
-						for (z=0; z<2040; z++)
-						{
-							if (buf[z] == 0x0 && buf[z+1] == 0x0 && buf[z+2] ==0x01 && buf[z+3] == 0xB5 && (buf[z+4] == 0x22 || buf[z+4] == 0x23))
+						// if we have 16:9 Zoom Mode on the DVD and we use a "always 16:9" mode on tv we have
+						// to patch the mpeg header and the Sequence Display Extension inside the Stream in some cases
+						if (dvd_aspect == 3 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_9) && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) {
+							int z=0;
+							for (z=0; z<2040; z++)
 							{
-								buf[z+5]=0x22;
-								buf[z+5]=0x0B;
-								buf[z+6]=0x42;
-								buf[z+7]=0x12;
-								buf[z+8]=0x00;
-							}
-						}
-						if (buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3) {
-							buf[33 + 7] = (buf[33 + 7] & 0xF) + 0x30;
-						}
-						if (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3) {
-							buf[36 + 7] = (buf[36 + 7] & 0xF) + 0x30;
-						}
-					}
-			
-					// check yres for detecting ntsc/pal
-					if (ddvd_have_ntsc == -1) {
-						if ((buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3 && ((buf[33+5] & 0xF) << 8) + buf[33+6] == 0x1E0) 
-							|| (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3 && ((buf[36+5] & 0xF) << 8) + buf[36+6] == 0x1E0))
-							ddvd_have_ntsc = 1;
-						else
-							ddvd_have_ntsc = 0;
-					}
-
-					safe_write(ddvd_output_fd, buf + 14, 2048 - 14);
-
-					// 14+8 header_length
-					// 14+(header_length)+3  -> start mpeg header
-					// buf[14+buf[14+8]+3] start mpeg header
-
-					int datalen = (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8];	// length mpeg packet
-					int data = buf[14 + buf[14 + 8] + 3];	// start mpeg packet(header)
-
-					int do_copy = (ddvd_iframerun == 0x01) && !(buf[data] == 0 && buf[data + 1] == 0 && buf[data + 2] == 1) ? 1 : 0;
-					int have_pictureheader = 0;
-					int haveslice = 0;
-					int setrun = 0;
-
-					while (datalen > 3) {
-						if (buf[data] == 0 && buf[data + 1] == 0 && buf[data + 2] == 1) {
-							if (buf[data + 3] == 0x00 && datalen > 6) { //picture
-								if (!setrun) {
-									ddvd_iframerun = ((buf[data + 5] >> 3) & 0x07);
-									setrun = 1;
+								if (buf[z] == 0x0 && buf[z+1] == 0x0 && buf[z+2] ==0x01 && buf[z+3] == 0xB5 && (buf[z+4] == 0x22 || buf[z+4] == 0x23))
+								{
+									buf[z+5]=0x22;
+									buf[z+5]=0x0B;
+									buf[z+6]=0x42;
+									buf[z+7]=0x12;
+									buf[z+8]=0x00;
 								}
-								if (ddvd_iframerun < 0x01 || 0x03 < ddvd_iframerun) {
-									data++;
-									datalen--;
-									continue;
+							}
+							if (buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3) {
+								buf[33 + 7] = (buf[33 + 7] & 0xF) + 0x30;
+							}
+							if (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3) {
+								buf[36 + 7] = (buf[36 + 7] & 0xF) + 0x30;
+							}
+						}
+				
+						// check yres for detecting ntsc/pal
+						if (ddvd_have_ntsc == -1) {
+							if ((buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3 && ((buf[33+5] & 0xF) << 8) + buf[33+6] == 0x1E0) 
+								|| (buf[36] == 0 && buf[36 + 1] == 0 && buf[36 + 2] == 1 && buf[36 + 3] == 0xB3 && ((buf[36+5] & 0xF) << 8) + buf[36+6] == 0x1E0))
+								ddvd_have_ntsc = 1;
+							else
+								ddvd_have_ntsc = 0;
+						}
+
+						safe_write(ddvd_output_fd, buf + 14, 2048 - 14);
+
+						// 14+8 header_length
+						// 14+(header_length)+3  -> start mpeg header
+						// buf[14+buf[14+8]+3] start mpeg header
+
+						int datalen = (buf[19] + (buf[18] << 8) + 6) - buf[14 + 8];	// length mpeg packet
+						int data = buf[14 + buf[14 + 8] + 3];	// start mpeg packet(header)
+
+						int do_copy = (ddvd_iframerun == 0x01) && !(buf[data] == 0 && buf[data + 1] == 0 && buf[data + 2] == 1) ? 1 : 0;
+						int have_pictureheader = 0;
+						int haveslice = 0;
+						int setrun = 0;
+
+						while (datalen > 3) {
+							if (buf[data] == 0 && buf[data + 1] == 0 && buf[data + 2] == 1) {
+								if (buf[data + 3] == 0x00 && datalen > 6) { //picture
+									if (!setrun) {
+										ddvd_iframerun = ((buf[data + 5] >> 3) & 0x07);
+										setrun = 1;
+									}
+									if (ddvd_iframerun < 0x01 || 0x03 < ddvd_iframerun) {
+										data++;
+										datalen--;
+										continue;
+									}
+									have_pictureheader = 1;
+									data += 5;
+									datalen -= 5;
+									datalen = 6;
+								} else if (buf[data + 3] == 0xB3 && datalen >= 8) { //sequence header
+									ddvd_last_iframe_len = 0;	// clear iframe buffer
+									data += 7;
+									datalen -= 7;
+								} else if (buf[data + 3] == 0xBE) { //padding stream
+									break;
+								} else if (0x01 <= buf[data + 3] && buf[data + 3] <= 0xaf) { //slice ?
+									if (!have_pictureheader && ddvd_last_iframe_len == 0)
+										haveslice = 1;
 								}
-								have_pictureheader = 1;
-								data += 5;
-								datalen -= 5;
-								datalen = 6;
-							} else if (buf[data + 3] == 0xB3 && datalen >= 8) { //sequence header
-								ddvd_last_iframe_len = 0;	// clear iframe buffer
-								data += 7;
-								datalen -= 7;
-							} else if (buf[data + 3] == 0xBE) { //padding stream
-								break;
-							} else if (0x01 <= buf[data + 3] && buf[data + 3] <= 0xaf) { //slice ?
-								if (!have_pictureheader && ddvd_last_iframe_len == 0)
-									haveslice = 1;
+							}
+							data++;
+							datalen--;
+						}
+						if ((ddvd_iframerun <= 0x01 || do_copy) && ddvd_still_frame) {
+							if (haveslice)
+								ddvd_iframerun = 0xFF;
+							else if (ddvd_last_iframe_len < (320 * 1024) - ((buf[19] + (buf[18] << 8) + 6) - buf[14 + 8])) {
+								int len = buf[19] + (buf[18] << 8) + 6;
+								int skip = buf[14+8] + 9; // skip complete pes header
+								len -= skip;
+								if (ddvd_last_iframe_len == 0) { // add simple pes header without pts
+									memcpy(last_iframe, "\x00\x00\x01\xE0\x00\x00\x80\x00\x00", 9);
+									ddvd_last_iframe_len += 9;
+								}
+								memcpy(last_iframe + ddvd_last_iframe_len, buf + 14 + skip, len);
+								ddvd_last_iframe_len += len;
 							}
 						}
-						data++;
-						datalen--;
-					}
-					if ((ddvd_iframerun <= 0x01 || do_copy) && ddvd_still_frame) {
-						if (haveslice)
-							ddvd_iframerun = 0xFF;
-						else if (ddvd_last_iframe_len < (320 * 1024) - ((buf[19] + (buf[18] << 8) + 6) - buf[14 + 8])) {
-							int len = buf[19] + (buf[18] << 8) + 6;
-							int skip = buf[14+8] + 9; // skip complete pes header
-							len -= skip;
-							if (ddvd_last_iframe_len == 0) { // add simple pes header without pts
-								memcpy(last_iframe, "\x00\x00\x01\xE0\x00\x00\x80\x00\x00", 9);
-								ddvd_last_iframe_len += 9;
-							}
-							memcpy(last_iframe + ddvd_last_iframe_len, buf + 14 + skip, len);
-							ddvd_last_iframe_len += len;
-						}
-					}
-				} else if ((buf[14 + 3]) == 0xC0 + audio_id)	// mpeg audio
-				{
-					if (audio_type != DDVD_MPEG) {
-						//printf("Switch to MPEG Audio\n");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-							perror("AUDIO_SET_AV_SYNC");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-							perror("AUDIO_SET_BYPASS_MODE");
-						audio_type = DDVD_MPEG;
-					}
-
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-						apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						apts |= buf[14 + 10] << 22;
-						apts |= (buf[14 + 11] >> 1) << 15;
-						apts |= buf[14 + 12] << 7;
-						apts |= (buf[14 + 14] >> 1);
-						//printf("APTS? %X\n",(int)apts);
-					}
-
-					safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);
-				} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0xA0 + audio_id)	// lpcm audio
-				{
-					if (audio_type != DDVD_LPCM) {
-						//printf("Switch to LPCM Audio\n");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-							perror("AUDIO_SET_AV_SYNC");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-							perror("AUDIO_SET_BYPASS_MODE");
-						audio_type = DDVD_LPCM;
-						ddvd_lpcm_count = 0;
-					}
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-						apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						apts |= buf[14 + 10] << 22;
-						apts |= (buf[14 + 11] >> 1) << 15;
-						apts |= buf[14 + 12] << 7;
-						apts |= (buf[14 + 14] >> 1);
-						//printf("APTS? %X\n",(int)apts);
-					}
-					int i = 0;
-					char abuf[(((buf[18] << 8) | buf[19]) - buf[22] - 14)];
-#if BYTE_ORDER == BIG_ENDIAN
-					// just copy, byte order is correct on ppc machines
-					memcpy(abuf, buf + 14 + buf[14 + 8] + 9 + 7, (((buf[18] << 8) | buf[19]) - buf[22] - 14));
-					i = (((buf[18] << 8) | buf[19]) - buf[22] - 14);
-#else
-					// byte swapping .. we become the wrong byteorder on lpcm on the 7025
-					while (i < (((buf[18] << 8) | buf[19]) - buf[22] - 14)) {
-						abuf[i + 0] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 1]);
-						abuf[i + 1] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 0]);
-						i += 2;
-					}
-#endif
-					// we will encode the raw lpcm data to mpeg audio and send them with pts
-					// information to the decoder to get a sync. playing the pcm data via
-					// oss will break the pic/sound sync. So believe it or not, this is the 
-					// smartest way to get a synced lpcm track ;-)
-					if (ddvd_lpcm_count == 0) {	// save mpeg header with pts
-						memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
-						mpa_header_length = buf[14 + 8] + 9;
-					}
-					if (ddvd_lpcm_count + i >= 4608) {	//we have to send 4608 bytes to the encoder
-						memcpy(lpcm_data + ddvd_lpcm_count, abuf, 4608 - ddvd_lpcm_count);
-						//encode
-						mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length, 4608, lpcm_data);
-						//patch pes__packet_length
-						mpa_count = mpa_count + mpa_header_length - 6;
-						mpa_data[4] = mpa_count >> 8;
-						mpa_data[5] = mpa_count & 0xFF;
-						//patch header type to mpeg
-						mpa_data[3] = 0xC0;
-						//write
-						safe_write(ddvd_ac3_fd, mpa_data, mpa_count + mpa_header_length);
-						memcpy(lpcm_data, abuf + (4608 - ddvd_lpcm_count), i - (4608 - ddvd_lpcm_count));
-						ddvd_lpcm_count = i - (4608 - ddvd_lpcm_count);
-						memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
-						mpa_header_length = buf[14 + 8] + 9;
-					} else {
-						memcpy(lpcm_data + ddvd_lpcm_count, abuf, i);
-						ddvd_lpcm_count += i;
-					}
-
-					//safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
-				} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x88 + audio_id) {	// dts audio
-					if (audio_type != DDVD_DTS) {
-						//printf("Switch to DTS Audio (thru)\n");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-							perror("AUDIO_SET_AV_SYNC");
-						if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 5) < 0)
-							perror("AUDIO_SET_BYPASS_MODE");
-						audio_type = DDVD_DTS;
-					}
-
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-						apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						apts |= buf[14 + 10] << 22;
-						apts |= (buf[14 + 11] >> 1) << 15;
-						apts |= buf[14 + 12] << 7;
-						apts |= (buf[14 + 14] >> 1);
-						//printf("APTS? %X\n",(int)apts);
-					}
-
-					safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);	// not working yet ....
-				} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x80 + audio_id) {	// ac3 audio
-					if (audio_type != DDVD_AC3) {
-						//printf("Switch to AC3 Audio\n");
-						if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-								perror("AUDIO_SET_AV_SYNC");
-#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)	// AC3 (dvb compliant)
-#else
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3) < 0)	// AC3 VOB
-#endif
-								perror("AUDIO_SET_BYPASS_MODE");
-						} else {
+					} else if ((buf[14 + 3]) == 0xC0 + audio_id)	// mpeg audio
+					{
+						if (audio_type != DDVD_MPEG) {
+							//printf("Switch to MPEG Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
 								perror("AUDIO_SET_BYPASS_MODE");
+							audio_type = DDVD_MPEG;
 						}
-						audio_type = DDVD_AC3;
-					}
 
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-						apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						apts |= buf[14 + 10] << 22;
-						apts |= (buf[14 + 11] >> 1) << 15;
-						apts |= buf[14 + 12] << 7;
-						apts |= (buf[14 + 14] >> 1);
-						//printf("APTS? %X\n",(int)apts);
-					}
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+							apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							apts |= buf[14 + 10] << 22;
+							apts |= (buf[14 + 11] >> 1) << 15;
+							apts |= buf[14 + 12] << 7;
+							apts |= (buf[14 + 14] >> 1);
+							//printf("APTS? %X\n",(int)apts);
+						}
 
-					if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
-#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
-						unsigned short pes_len = (buf[14 + 4] << 8 | buf[14 + 5]);
-						pes_len -= 4;	// strip first 4 bytes of pes payload
-						buf[14 + 4] = pes_len >> 8;	// patch pes len
-						buf[15 + 4] = pes_len & 0xFF;
-
-						safe_write(ddvd_ac3_fd, buf + 14, 9 + buf[14 + 8]);	// write pes_header
-						safe_write(ddvd_ac3_fd, buf + 14 + 9 + buf[14 + 8] + 4, pes_len - (3 + buf[14 + 8]));	// write pes_payload
-#else
 						safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);
-#endif
-						//fwrite(buf+buf[22]+27, 1, ((buf[18]<<8)|buf[19])-buf[22]-7, fac3); //debugwrite
-					} else {
-						// a bit more funny than lpcm sound, because we do a complete recoding here
-						// we will decode the ac3 data to plain lpcm and will then encode to mpeg
-						// audio and send them with pts information to the decoder to get a sync.
-
-						// decode and convert ac3 to raw lpcm
-						ac3_len = ddvd_ac3_decode(buf + buf[22] + 27, ((buf[18] << 8) | buf[19]) - buf[22] - 7, ac3_tmp);
-
-						// save the pes header incl. PTS
-						memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
-						mpa_header_length = buf[14 + 8] + 9;
-
-						//apts-=(((unsigned long long)(ddvd_lpcm_count)*90)/192);
-
-						//mpa_data[14]=(int)((apts<<1)&0xFF);
-						//mpa_data[12]=(int)((apts>>7)&0xFF);
-						//mpa_data[11]=(int)(((apts<<1)>>15)&0xFF);
-						//mpa_data[10]=(int)((apts>>22)&0xFF);
-
-						// copy lpcm data into buffer for encoding
-						memcpy(lpcm_data + ddvd_lpcm_count, ac3_tmp, ac3_len);
-						ddvd_lpcm_count += ac3_len;
-
-						// encode the whole packet to mpa
-						mpa_count2 = mpa_count = 0;
-						while (ddvd_lpcm_count >= 4608) {
-							mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length + mpa_count2, 4608, lpcm_data);
-							mpa_count2 += mpa_count;
-							ddvd_lpcm_count -= 4608;
-							memcpy(lpcm_data, lpcm_data + 4608, ddvd_lpcm_count);
-						}
-
-						// patch pes__packet_length
-						mpa_count = mpa_count2 + mpa_header_length - 6;
-						mpa_data[4] = mpa_count >> 8;
-						mpa_data[5] = mpa_count & 0xFF;
-
-						// patch header type to mpeg
-						mpa_data[3] = 0xC0;
-
-						// write to decoder
-						safe_write(ddvd_ac3_fd, mpa_data, mpa_count2 + mpa_header_length);
-
-					}
-				} else if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xE0) == 0x20 && ((buf[14 + buf[14 + 8] + 9]) & 0x1F) == spu_active_id) {	// SPU packet
-					memcpy(spu_buffer + ddvd_spu_ptr, buf + buf[22] + 14 + 10, 2048 - (buf[22] + 14 + 10));
-					ddvd_spu_ptr += 2048 - (buf[22] + 14 + 10);
-
-					if (buf[14 + 7] & 128) {
-						/* damn gcc bug */
-#if CONFIG_API_VERSION == 3
-						spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
-						spts |= buf[14 + 10] << 22;
-						spts |= (buf[14 + 11] >> 1) << 15;
-						spts |= buf[14 + 12] << 7;
-						spts |= (buf[14 + 14] >> 1);
-#else
-						spts = (buf[14 + 9] >> 1) << 29;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
-						spts |= buf[14 + 10] << 21;
-						spts |= (buf[14 + 11] >> 1) << 14;
-						spts |= buf[14 + 12] << 6;
-						spts |= buf[14 + 12] >> 2;
-#endif
-						//printf("SPTS? %X\n",(int)spts);
-					}
-
-					if (ddvd_spu_ptr >= (spu_buffer[0] << 8 | spu_buffer[1]))	// SPU packet complete ?
+					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0xA0 + audio_id)	// lpcm audio
 					{
-						if (ddvd_spu_backnr == 3)	// backbuffer already full ?
-						{
-							int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
-							memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete oldest SPU packet
-							spu_backpts[0] = spu_backpts[1];
-							spu_backpts[1] = spu_backpts[2];
-							ddvd_spu_backnr = 2;
-							ddvd_spu_backptr -= tmplen;
+						if (audio_type != DDVD_LPCM) {
+							//printf("Switch to LPCM Audio\n");
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+								perror("AUDIO_SET_AV_SYNC");
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
+								perror("AUDIO_SET_BYPASS_MODE");
+							audio_type = DDVD_LPCM;
+							ddvd_lpcm_count = 0;
+						}
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+							apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							apts |= buf[14 + 10] << 22;
+							apts |= (buf[14 + 11] >> 1) << 15;
+							apts |= buf[14 + 12] << 7;
+							apts |= (buf[14 + 14] >> 1);
+							//printf("APTS? %X\n",(int)apts);
+						}
+						int i = 0;
+						char abuf[(((buf[18] << 8) | buf[19]) - buf[22] - 14)];
+#if BYTE_ORDER == BIG_ENDIAN
+						// just copy, byte order is correct on ppc machines
+						memcpy(abuf, buf + 14 + buf[14 + 8] + 9 + 7, (((buf[18] << 8) | buf[19]) - buf[22] - 14));
+						i = (((buf[18] << 8) | buf[19]) - buf[22] - 14);
+#else
+						// byte swapping .. we become the wrong byteorder on lpcm on the 7025
+						while (i < (((buf[18] << 8) | buf[19]) - buf[22] - 14)) {
+							abuf[i + 0] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 1]);
+							abuf[i + 1] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 0]);
+							i += 2;
+						}
+#endif
+						// we will encode the raw lpcm data to mpeg audio and send them with pts
+						// information to the decoder to get a sync. playing the pcm data via
+						// oss will break the pic/sound sync. So believe it or not, this is the 
+						// smartest way to get a synced lpcm track ;-)
+						if (ddvd_lpcm_count == 0) {	// save mpeg header with pts
+							memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
+							mpa_header_length = buf[14 + 8] + 9;
+						}
+						if (ddvd_lpcm_count + i >= 4608) {	//we have to send 4608 bytes to the encoder
+							memcpy(lpcm_data + ddvd_lpcm_count, abuf, 4608 - ddvd_lpcm_count);
+							//encode
+							mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length, 4608, lpcm_data);
+							//patch pes__packet_length
+							mpa_count = mpa_count + mpa_header_length - 6;
+							mpa_data[4] = mpa_count >> 8;
+							mpa_data[5] = mpa_count & 0xFF;
+							//patch header type to mpeg
+							mpa_data[3] = 0xC0;
+							//write
+							safe_write(ddvd_ac3_fd, mpa_data, mpa_count + mpa_header_length);
+							memcpy(lpcm_data, abuf + (4608 - ddvd_lpcm_count), i - (4608 - ddvd_lpcm_count));
+							ddvd_lpcm_count = i - (4608 - ddvd_lpcm_count);
+							memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
+							mpa_header_length = buf[14 + 8] + 9;
+						} else {
+							memcpy(lpcm_data + ddvd_lpcm_count, abuf, i);
+							ddvd_lpcm_count += i;
 						}
 
-						memcpy(spu_backbuffer + ddvd_spu_backptr, spu_buffer, (spu_buffer[0] << 8 | spu_buffer[1]));	// copy into backbuffer
-						spu_backpts[ddvd_spu_backnr++] = spts;	// store pts
-						ddvd_spu_backptr += (spu_buffer[0] << 8 | spu_buffer[1]);	// increase ptr
+						//safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
+					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x88 + audio_id) {	// dts audio
+						if (audio_type != DDVD_DTS) {
+							//printf("Switch to DTS Audio (thru)\n");
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+								perror("AUDIO_SET_AV_SYNC");
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 5) < 0)
+								perror("AUDIO_SET_BYPASS_MODE");
+							audio_type = DDVD_DTS;
+						}
 
-						ddvd_spu_ptr = 0;
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+							apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							apts |= buf[14 + 10] << 22;
+							apts |= (buf[14 + 11] >> 1) << 15;
+							apts |= buf[14 + 12] << 7;
+							apts |= (buf[14 + 14] >> 1);
+							//printf("APTS? %X\n",(int)apts);
+						}
+
+						safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);	// not working yet ....
+					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x80 + audio_id) {	// ac3 audio
+						if (audio_type != DDVD_AC3) {
+							//printf("Switch to AC3 Audio\n");
+							if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
+								if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+									perror("AUDIO_SET_AV_SYNC");
+#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
+								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)	// AC3 (dvb compliant)
+#else
+								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3) < 0)	// AC3 VOB
+#endif
+									perror("AUDIO_SET_BYPASS_MODE");
+							} else {
+								if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+									perror("AUDIO_SET_AV_SYNC");
+								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
+									perror("AUDIO_SET_BYPASS_MODE");
+							}
+							audio_type = DDVD_AC3;
+						}
+
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+							apts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							apts |= buf[14 + 10] << 22;
+							apts |= (buf[14 + 11] >> 1) << 15;
+							apts |= buf[14 + 12] << 7;
+							apts |= (buf[14 + 14] >> 1);
+							//printf("APTS? %X\n",(int)apts);
+						}
+
+						if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
+#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
+							unsigned short pes_len = (buf[14 + 4] << 8 | buf[14 + 5]);
+							pes_len -= 4;	// strip first 4 bytes of pes payload
+							buf[14 + 4] = pes_len >> 8;	// patch pes len
+							buf[15 + 4] = pes_len & 0xFF;
+
+							safe_write(ddvd_ac3_fd, buf + 14, 9 + buf[14 + 8]);	// write pes_header
+							safe_write(ddvd_ac3_fd, buf + 14 + 9 + buf[14 + 8] + 4, pes_len - (3 + buf[14 + 8]));	// write pes_payload
+#else
+							safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);
+#endif
+							//fwrite(buf+buf[22]+27, 1, ((buf[18]<<8)|buf[19])-buf[22]-7, fac3); //debugwrite
+						} else {
+							// a bit more funny than lpcm sound, because we do a complete recoding here
+							// we will decode the ac3 data to plain lpcm and will then encode to mpeg
+							// audio and send them with pts information to the decoder to get a sync.
+
+							// decode and convert ac3 to raw lpcm
+							ac3_len = ddvd_ac3_decode(buf + buf[22] + 27, ((buf[18] << 8) | buf[19]) - buf[22] - 7, ac3_tmp);
+
+							// save the pes header incl. PTS
+							memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
+							mpa_header_length = buf[14 + 8] + 9;
+
+							//apts-=(((unsigned long long)(ddvd_lpcm_count)*90)/192);
+
+							//mpa_data[14]=(int)((apts<<1)&0xFF);
+							//mpa_data[12]=(int)((apts>>7)&0xFF);
+							//mpa_data[11]=(int)(((apts<<1)>>15)&0xFF);
+							//mpa_data[10]=(int)((apts>>22)&0xFF);
+
+							// copy lpcm data into buffer for encoding
+							memcpy(lpcm_data + ddvd_lpcm_count, ac3_tmp, ac3_len);
+							ddvd_lpcm_count += ac3_len;
+
+							// encode the whole packet to mpa
+							mpa_count2 = mpa_count = 0;
+							while (ddvd_lpcm_count >= 4608) {
+								mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length + mpa_count2, 4608, lpcm_data);
+								mpa_count2 += mpa_count;
+								ddvd_lpcm_count -= 4608;
+								memcpy(lpcm_data, lpcm_data + 4608, ddvd_lpcm_count);
+							}
+
+							// patch pes__packet_length
+							mpa_count = mpa_count2 + mpa_header_length - 6;
+							mpa_data[4] = mpa_count >> 8;
+							mpa_data[5] = mpa_count & 0xFF;
+
+							// patch header type to mpeg
+							mpa_data[3] = 0xC0;
+
+							// write to decoder
+							safe_write(ddvd_ac3_fd, mpa_data, mpa_count2 + mpa_header_length);
+
+						}
+					} else if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xE0) == 0x20 && ((buf[14 + buf[14 + 8] + 9]) & 0x1F) == spu_active_id) {	// SPU packet
+						memcpy(spu_buffer + ddvd_spu_ptr, buf + buf[22] + 14 + 10, 2048 - (buf[22] + 14 + 10));
+						ddvd_spu_ptr += 2048 - (buf[22] + 14 + 10);
+
+						if (buf[14 + 7] & 128) {
+							/* damn gcc bug */
+#if CONFIG_API_VERSION == 3
+							spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
+							spts |= buf[14 + 10] << 22;
+							spts |= (buf[14 + 11] >> 1) << 15;
+							spts |= buf[14 + 12] << 7;
+							spts |= (buf[14 + 14] >> 1);
+#else
+							spts = (buf[14 + 9] >> 1) << 29;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
+							spts |= buf[14 + 10] << 21;
+							spts |= (buf[14 + 11] >> 1) << 14;
+							spts |= buf[14 + 12] << 6;
+							spts |= buf[14 + 12] >> 2;
+#endif
+							//printf("SPTS? %X\n",(int)spts);
+						}
+
+						if (ddvd_spu_ptr >= (spu_buffer[0] << 8 | spu_buffer[1]))	// SPU packet complete ?
+						{
+							if (ddvd_spu_backnr == 3)	// backbuffer already full ?
+							{
+								int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
+								memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete oldest SPU packet
+								spu_backpts[0] = spu_backpts[1];
+								spu_backpts[1] = spu_backpts[2];
+								ddvd_spu_backnr = 2;
+								ddvd_spu_backptr -= tmplen;
+							}
+
+							memcpy(spu_backbuffer + ddvd_spu_backptr, spu_buffer, (spu_buffer[0] << 8 | spu_buffer[1]));	// copy into backbuffer
+							spu_backpts[ddvd_spu_backnr++] = spts;	// store pts
+							ddvd_spu_backptr += (spu_buffer[0] << 8 | spu_buffer[1]);	// increase ptr
+
+							ddvd_spu_ptr = 0;
+						}
 					}
 				}
 				break;
@@ -1311,14 +1315,24 @@ send_message:
 					break;
 				}	
 				uint16_t spu_lang = 0xFFFF;
-				int spu_id_logical;
-				spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
+				int spu_id_logical, count_tmp;
+				spu_id_logical = -1;
+				count_tmp = spu_active_id;
+				while (count_tmp >= 0 && count_tmp < 32)
+				{
+					spu_id_logical = spu_map[count_tmp];
+					if (spu_id_logical >= 0)
+						count_tmp = 0;
+					count_tmp--;
+				}
+				
 				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 				if (spu_lang == 0xFFFF) {
 					spu_lang = 0x2D2D;	// SPU "off, unknown or maybe menuoverlays" 
+					spu_id_logical = -1;
 				}							
 				msg = DDVD_SHOWOSD_SUBTITLE;
-				int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
+				int report_spu = spu_id_logical > 31 ? -1 : spu_id_logical;
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &report_spu, sizeof(int));
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
@@ -1480,7 +1494,17 @@ send_message:
 					audio_lock = 0;	// reset audio & spu lock
 					spu_lock = 0;
 					audio_format[0] = audio_format[1] = audio_format[2] = audio_format[4] = audio_format[4] = audio_format[5] = audio_format[6] = audio_format[7] = -1;
-
+					// fill spu_map with data
+					int count_tmp,spu_tmp;
+					for (count_tmp = 0; count_tmp < 32; count_tmp++)
+						spu_map[count_tmp] = -1;
+					for (count_tmp = 0; count_tmp < 32; count_tmp++)
+					{
+						spu_tmp = dvdnav_get_spu_logical_stream(dvdnav, count_tmp);
+						if (spu_tmp >= 0 && spu_tmp < 32)
+							spu_map[spu_tmp] = count_tmp;
+					}
+					
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
 					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect, tv_mode);
@@ -1536,15 +1560,23 @@ send_message:
 							spu_lock = 1;//playerconfig->resume_spu_lock;
 							report_audio_info = 1;
 							uint16_t spu_lang = 0xFFFF;
-							int spu_id_logical;
-							spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
+							int spu_id_logical, count_tmp;
+							count_tmp = spu_active_id;
+							while (count_tmp >= 0)
+							{
+								spu_id_logical = spu_map[count_tmp];
+								if (spu_id_logical >= 0)
+									count_tmp = 0;
+								count_tmp--;
+							}
 							spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 							if (spu_lang == 0xFFFF) {
 								spu_lang = 0x2D2D;	// SPU "off" 
 								spu_active_id = -1;
+								spu_id_logical = -1;
 							}
 							msg = DDVD_SHOWOSD_SUBTITLE;
-							int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
+							int report_spu = spu_id_logical > 31 ? -1 : spu_id_logical;
 							safe_write(message_pipe, &msg, sizeof(int));
 							safe_write(message_pipe, &report_spu, sizeof(int));
 							safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
@@ -1934,17 +1966,27 @@ key_play:
 				case DDVD_KEY_SUBTITLE:	//change spu track 
 					{
 						uint16_t spu_lang = 0xFFFF;
-						int spu_id_logical;
-						spu_active_id++;
-						spu_id_logical = dvdnav_get_spu_logical_stream(dvdnav, spu_active_id);
+						int spu_id_logical, count_tmp;
+						spu_id_logical = -1;
+						count_tmp = spu_active_id;
+						while (count_tmp >= 0)
+						{
+							spu_id_logical = spu_map[count_tmp];
+							if (spu_id_logical >= 0)
+								count_tmp = 0;
+							count_tmp--;
+						}						
+						spu_id_logical++;
+						spu_active_id = dvdnav_get_spu_logical_stream(dvdnav, spu_id_logical);
 						spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 						if (spu_lang == 0xFFFF) {
 							spu_lang = 0x2D2D;	// SPU "off" 
 							spu_active_id = -1;
+							spu_id_logical = -1;
 						}
 						spu_lock = 1;
 						msg = DDVD_SHOWOSD_SUBTITLE;
-						int report_spu = spu_active_id > 31 ? -1 : spu_active_id;
+						int report_spu = spu_id_logical > 31 ? -1 : spu_id_logical;
 						safe_write(message_pipe, &msg, sizeof(int));
 						safe_write(message_pipe, &report_spu, sizeof(int));
 						safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
