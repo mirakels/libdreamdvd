@@ -1704,11 +1704,11 @@ send_message:
 			in_menu = pci && pci->hli.hl_gi.btn_ns > 0;
 		}
 
-		if (in_menu && !playerconfig->in_menu) {
+		if ((dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav)) && !playerconfig->in_menu) {
 			int bla = DDVD_MENU_OPENED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 1;
-		} else if (!in_menu && playerconfig->in_menu) {
+		} else if (!(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav)) && playerconfig->in_menu) {
 			int bla = DDVD_MENU_CLOSED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 0;
