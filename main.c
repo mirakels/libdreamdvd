@@ -1682,6 +1682,12 @@ send_message:
 				ddvd_spu_timer_end = ddvd_get_time() + (ddvd_display_time * 10);	//ms
 			} else
 				ddvd_spu_timer_active = 0;
+			
+			// dont display SPU if spu sets the HIDE command or the actual SPU track is marked as hide (bit 7) and the packet had no FORCE command
+			if (last_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) && last_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
+				ddvd_lbb_changed = 0;
+				ddvd_spu_timer_active = 0;
+			}
 
 			pci = dvdnav_get_current_nav_pci(dvdnav);	//update highlight buttons
 			dsi = dvdnav_get_current_nav_dsi(dvdnav);
@@ -2328,6 +2334,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 	int size, datasize, controlsize, aligned, id;
 	int menubutton = 0;
 	int display_time = -1;
+	int force_hide = SPU_NOP;
 
 	size = (buffer[0] << 8 | buffer[1]);
 	datasize = (buffer[2] << 8 | buffer[3]);
@@ -2339,15 +2346,16 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 
 	while (i < size && buffer[i] != 0xFF) {
 		switch (buffer[i]) {
-		case 0x00:	/* menu button special color handling */
-			menubutton = 1;
-			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
+		case 0x00:	/* force */
+			force_hide = SPU_FORCE;
 			i++;
 			break;
 		case 0x01:	/* show */
+			force_hide = SPU_SHOW;
 			i++;
 			break;
 		case 0x02:	/* hide */
+			force_hide = SPU_HIDE;
 			i++;
 			break;
 		case 0x03:	/* palette */
@@ -2470,6 +2478,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 	return_code.x_end = x2spu;
 	return_code.y_start = y1spu;
 	return_code.y_end = y2spu;
+	return_code.force_hide = force_hide;
 	
 	return return_code;
 }

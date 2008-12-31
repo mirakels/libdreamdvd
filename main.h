@@ -115,12 +115,14 @@ typedef struct ddvd_spudec_clut_struct {
 #endif
 } ddvd_spudec_clut_t;
 
+enum {SPU_NOP, SPU_SHOW, SPU_HIDE, SPU_FORCE};
 struct ddvd_spu_return {
 	int display_time;
 	int x_start;
 	int x_end;
 	int y_start;
 	int y_end;
+	int force_hide;
 };
 
 struct ddvd_resize_return {
