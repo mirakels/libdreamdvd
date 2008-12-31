@@ -1639,7 +1639,7 @@ send_message:
 		if (ioctl(ddvd_output_fd, VIDEO_GET_PTS, &tpts) < 0)
 			perror("VIDEO_GET_PTS");
 		pts = (unsigned long long)tpts;
-		signed long long diff = spts - pts;
+		signed long long diff = spu_backpts[0] - pts;
 		if (ddvd_spu_backnr > 0 && diff <= 0xFF)	// we only have a 32bit pts on vulcan/pallas (instead of 33bit) so we need some tolerance on syncing SPU for menus
 													// so on non animated menus the buttons will be displayed to soon, but we we have to accept it
 #else
