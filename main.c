@@ -1710,11 +1710,11 @@ send_message:
 			in_menu = pci && pci->hli.hl_gi.btn_ns > 0;
 		}
 
-		if ((dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav)) && !playerconfig->in_menu) {
+		if ((dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav) || in_menu) && !playerconfig->in_menu) {
 			int bla = DDVD_MENU_OPENED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 1;
-		} else if (!(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav)) && playerconfig->in_menu) {
+		} else if (!(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav) || in_menu) && playerconfig->in_menu) {
 			int bla = DDVD_MENU_CLOSED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 0;
@@ -2330,7 +2330,7 @@ static void ddvd_device_clear(void)
 static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int len)
 {
 	int x1spu, x2spu, y1spu, y2spu, xspu, yspu;
-	int offset[2];
+	int offset[2], param_len;
 	int size, datasize, controlsize, aligned, id;
 	int menubutton = 0;
 	int display_time = -1;
@@ -2412,6 +2412,11 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 			offset[1] = (((unsigned int)buffer[i + 3]) << 8) + buffer[i + 4];
 			//printf("%d %d\n", offset[0], offset[1]);
 			i += 5;
+			break;
+		case 0x07:	/* change color for a special area so overlays with more than 4 colors are possible - NOT IMPLEMENTET YET */
+			//printf("change color packet\n");
+			param_len = (buffer[i + 1] << 8 | buffer[i + 2]);
+			i += param_len + 1;
 			break;
 		default:
 			i++;
