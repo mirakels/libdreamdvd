@@ -291,6 +291,10 @@ int ddvd_get_next_message(struct ddvd *pconfig, int blocked)
 	case DDVD_SCREEN_UPDATE:
 		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->blit_area, sizeof(pconfig->blit_area), 1);
 		break;	
+	case DDVD_SHOWOSD_ANGLE:
+		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->angle_current, sizeof(int), 1);
+		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->angle_num, sizeof(int), 1);
+		break;
 	default:
 		break;
 	}
@@ -306,6 +310,13 @@ void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int
 	memcpy(x_end, &ptr->x_end, sizeof(int));
 	memcpy(y_start, &ptr->y_start, sizeof(int));
 	memcpy(y_end, &ptr->y_end, sizeof(int));
+}
+
+// get angle info
+void ddvd_get_angle_info(struct ddvd*pconfig, int *current, int *num)
+{
+	memcpy(current, &pconfig->angle_current, sizeof(pconfig->angle_current));
+	memcpy(num, &pconfig->angle_num, sizeof(pconfig->angle_num));
 }
 
 // get last colortable for 8bit mode (4 colors)
@@ -1590,6 +1601,13 @@ send_message:
 						playerconfig->resume_spu_id = 0;
 						playerconfig->resume_spu_lock = 0;
 					}
+					// multiple angels ?
+					int num = 0, current = 0;
+					dvdnav_get_angle_info(dvdnav, &current, &num);
+					msg = DDVD_SHOWOSD_ANGLE;
+					safe_write(message_pipe, &msg, sizeof(int));
+					safe_write(message_pipe, &current, sizeof(int));
+					safe_write(message_pipe, &num, sizeof(int));
 				}
 				break;
 
@@ -1651,20 +1669,22 @@ send_message:
 			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 			
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
+			int whole_screen = 0;
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
 				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
-				blit_area.x_start = blit_area.y_start = 0;
-				blit_area.x_end = ddvd_screeninfo_xres - 1;
-				blit_area.y_end = ddvd_screeninfo_yres - 1;
-				msg = DDVD_SCREEN_UPDATE;
-				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+				whole_screen = 1;
 			}
 			
 			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer .. 
 			last_spu_return = ddvd_spu_decode_data(spu_backbuffer, tmplen);	// decode
 			ddvd_display_time = last_spu_return.display_time;
 			ddvd_lbb_changed = 1;
+			
+			if (whole_screen) {
+				last_spu_return.x_start = last_spu_return.x_start = 0;
+				last_spu_return.x_end = 719;
+				last_spu_return.y_end = 575;
+			}
 
 			struct ddvd_color colneu;
 			int ctmp;
@@ -2011,6 +2031,32 @@ key_play:
 						safe_write(message_pipe, &msg, sizeof(int));
 						safe_write(message_pipe, &report_spu, sizeof(int));
 						safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
+						break;
+					}
+				case DDVD_KEY_ANGLE: //change angle
+					{
+						int num = 0, current = 0;
+						dvdnav_get_angle_info(dvdnav, &current, &num);
+						if(num != 0) {
+							current++;
+						if(current > num)
+							current = 1;
+						}
+						dvdnav_angle_change(dvdnav, current);
+						msg = DDVD_SHOWOSD_ANGLE;
+						safe_write(message_pipe, &msg, sizeof(int));
+						safe_write(message_pipe, &current, sizeof(int));
+						safe_write(message_pipe, &num, sizeof(int));
+						break;
+					}
+				case DDVD_GET_ANGLE: //frontend wants angle info
+					{
+						int num = 0, current = 0;
+						dvdnav_get_angle_info(dvdnav, &current, &num);
+						msg = DDVD_SHOWOSD_ANGLE;
+						safe_write(message_pipe, &msg, sizeof(int));
+						safe_write(message_pipe, &current, sizeof(int));
+						safe_write(message_pipe, &num, sizeof(int));
 						break;
 					}
 				case DDVD_GET_TIME:	// frontend wants actual time

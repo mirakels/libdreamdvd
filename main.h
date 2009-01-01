@@ -209,6 +209,8 @@ struct ddvd {
 	int resume_spu_lock;
 	int should_resume;
 	struct ddvd_resize_return blit_area;
+	int angle_current;
+	int angle_num;
 };
 
 /* internal functions */

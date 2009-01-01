@@ -128,6 +128,9 @@ void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int
 // struct ddvd_time timestamp
 void ddvd_get_last_time(struct ddvd*pconfig, void *timestamp);
 
+// get actual angle info after DDVD_SHOWOSD_ANGLE
+void ddvd_get_angle_info(struct ddvd*pconfig, int *current, int *num);
+
 // get the actual trickspeed (2-64x) when in trickmode
 // int trickspeed
 void ddvd_get_last_trickspeed(struct ddvd*pconfig, void *trickspeed);
@@ -189,6 +192,7 @@ enum { // state
 	DDVD_SOF_REACHED,
 	DDVD_MENU_OPENED,
 	DDVD_MENU_CLOSED,
+	DDVD_SHOWOSD_ANGLE,			// show angle info, you can get it with ddvd_get_angle_info	
 };
 
 
@@ -229,6 +233,8 @@ enum { // send_key
 	DDVD_SET_MUTE,				// just telling dreamdvd that the sound has been muted, libdreamdvd does not mute for you, but has to know
 								// the mute state for sound handling on ffwd/fbwd trick mode
 	DDVD_UNSET_MUTE,			// sound is not muted any more (see DDVD_SET_MUTE)
+	DDVD_KEY_ANGLE,				// change angle on the fly 	
+	DDVD_GET_ANGLE,				// get actual angle info	
 };
 
 // if you use the same keys for different functions in different contexts (menu/movie) just send both commands, the player will 
