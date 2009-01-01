@@ -447,8 +447,8 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	memset(ddvd_lbb, 0, 720 * 576);
 	memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen			
 	blit_area.x_start = blit_area.y_start = 0;
-	blit_area.x_end = ddvd_screeninfo_xres;
-	blit_area.y_end = ddvd_screeninfo_yres;
+	blit_area.x_end = ddvd_screeninfo_xres - 1;
+	blit_area.y_end = ddvd_screeninfo_yres - 1;
 	
 	msg = DDVD_SCREEN_UPDATE;
 	safe_write(message_pipe, &msg, sizeof(int));
@@ -1650,6 +1650,17 @@ send_message:
 		{
 			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 			
+			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
+			if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
+				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
+				blit_area.x_start = blit_area.y_start = 0;
+				blit_area.x_end = ddvd_screeninfo_xres - 1;
+				blit_area.y_end = ddvd_screeninfo_yres - 1;
+				msg = DDVD_SCREEN_UPDATE;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+			}
+			
 			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer .. 
 			last_spu_return = ddvd_spu_decode_data(spu_backbuffer, tmplen);	// decode
 			ddvd_display_time = last_spu_return.display_time;
@@ -1682,7 +1693,7 @@ send_message:
 				ddvd_spu_timer_end = ddvd_get_time() + (ddvd_display_time * 10);	//ms
 			} else
 				ddvd_spu_timer_active = 0;
-			
+
 			// dont display SPU if spu sets the HIDE command or the actual SPU track is marked as hide (bit 7) and the packet had no FORCE command
 			if (last_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) && last_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
 				ddvd_lbb_changed = 0;
@@ -1769,8 +1780,8 @@ send_message:
 					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 					memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
 					blit_area.x_start = blit_area.y_start = 0;
-					blit_area.x_end = ddvd_screeninfo_xres;
-					blit_area.y_end = ddvd_screeninfo_yres;
+					blit_area.x_end = ddvd_screeninfo_xres - 1;
+					blit_area.y_end = ddvd_screeninfo_yres - 1;
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
@@ -2087,7 +2098,7 @@ key_play:
 				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-			//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
 			int msg_old = msg;	// save and restore msg it may not be empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2154,8 +2165,8 @@ err_open_output_fd:
 	//Clear Screen
 	//struct ddvd_resize_return blit_area;			
 	blit_area.x_start = blit_area.y_start = 0;
-	blit_area.x_end = ddvd_screeninfo_xres;
-	blit_area.y_end = ddvd_screeninfo_yres;
+	blit_area.x_end = ddvd_screeninfo_xres - 1;
+	blit_area.y_end = ddvd_screeninfo_yres - 1;
 	memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);
 	msg = DDVD_SCREEN_UPDATE;
 	safe_write(message_pipe, &msg, sizeof(int));
@@ -2548,8 +2559,8 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xso
 	return_code.y_end = return_code.y_end > ydest ? ydest : return_code.y_end;
 	
 	int x2, y2, c, i ,j;
-    for (i=return_code.y_start;i<return_code.y_end;i++) {
-        for (j=return_code.x_start;j<return_code.x_end;j++) {
+    for (i=return_code.y_start;i<=return_code.y_end;i++) {
+        for (j=return_code.x_start;j<=return_code.x_end;j++) {
             x2 = ((j*x_ratio)>>16) ;
             y2 = ((i*y_ratio)>>16)+yoffset ;
             for (c=0; c<colors; c++)
@@ -2598,7 +2609,7 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 	unsigned int sx1[xd],sx2[xd],sy1,sy2;
 	
 	// pre calculating sx1/sx2 for faster resizing
-	for (x=return_code.x_start; x<return_code.x_end; x++) 
+	for (x=return_code.x_start; x<=return_code.x_end; x++) 
 	{
 		// first x source pixel for calculating destination pixel
 		sx1[x]=(fx*x)>>16; //floor()
@@ -2610,7 +2621,7 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 	}
 	
 	// Scale
-	for (y=return_code.y_start; y<return_code.y_end; y++) 
+	for (y=return_code.y_start; y<=return_code.y_end; y++) 
 	{
 
 		// first y source pixel for calculating destination pixel
@@ -2621,7 +2632,7 @@ struct ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, 
 		if (fy & 0x7FFF) //ceil()
 			sy2++;
 
-		for (x=return_code.x_start; x<return_code.x_end; x++) 
+		for (x=return_code.x_start; x<=return_code.x_end; x++) 
 		{
 			// we do this for every color
 			for (c=0; c<colors; c++) 
@@ -2674,11 +2685,11 @@ struct ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xso
 	return_code.y_end = return_code.y_end > ydest ? ydest : return_code.y_end;
 	
 	// scale x
-	for (i = return_code.x_start; i < return_code.x_end; i++)
+	for (i = return_code.x_start; i <= return_code.x_end; i++)
 		pixmap[i+xoffset]=pixmap_tmp[((fx*i)/10)];
 
 	// scale y
-	for (i = return_code.y_start; i < return_code.y_end; i++)
+	for (i = return_code.y_start; i <= return_code.y_end; i++)
 	{
 		tmp=(fy*i)/10;
 		if (tmp != i)
