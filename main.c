@@ -1015,7 +1015,11 @@ send_message:
 							//printf("Switch to LPCM Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("AUDIO_SET_AV_SYNC");
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
+#ifdef HARDWARE_SUPPORT_LPCM
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 6) < 0)
+#else
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)
+#endif
 								perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_LPCM;
 							ddvd_lpcm_count = 0;
@@ -1029,20 +1033,21 @@ send_message:
 							apts |= (buf[14 + 14] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
+#ifndef HARDWARE_SUPPORT_LPCM
 						int i = 0;
 						char abuf[(((buf[18] << 8) | buf[19]) - buf[22] - 14)];
-#if BYTE_ORDER == BIG_ENDIAN
+    #if BYTE_ORDER == BIG_ENDIAN
 						// just copy, byte order is correct on ppc machines
 						memcpy(abuf, buf + 14 + buf[14 + 8] + 9 + 7, (((buf[18] << 8) | buf[19]) - buf[22] - 14));
 						i = (((buf[18] << 8) | buf[19]) - buf[22] - 14);
-#else
+    #else
 						// byte swapping .. we become the wrong byteorder on lpcm on the 7025
 						while (i < (((buf[18] << 8) | buf[19]) - buf[22] - 14)) {
 							abuf[i + 0] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 1]);
 							abuf[i + 1] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 0]);
 							i += 2;
 						}
-#endif
+    #endif
 						// we will encode the raw lpcm data to mpeg audio and send them with pts
 						// information to the decoder to get a sync. playing the pcm data via
 						// oss will break the pic/sound sync. So believe it or not, this is the 
@@ -1071,8 +1076,9 @@ send_message:
 							memcpy(lpcm_data + ddvd_lpcm_count, abuf, i);
 							ddvd_lpcm_count += i;
 						}
-
-						//safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
+#else
+						safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
+#endif
 					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x88 + audio_id) {	// dts audio
 						if (audio_type != DDVD_DTS) {
 							//printf("Switch to DTS Audio (thru)\n");
