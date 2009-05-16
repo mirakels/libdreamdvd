@@ -1084,7 +1084,11 @@ send_message:
 							//printf("Switch to DTS Audio (thru)\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("AUDIO_SET_AV_SYNC");
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 5) < 0)
+#ifdef CONVERT_TO_DVB_COMPLIANT_DTS
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 2) < 0)	// DTS (dvb compliant)
+#else
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 5) < 0)	// DTS VOB
+#endif
 								perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_DTS;
 						}
@@ -1099,7 +1103,17 @@ send_message:
 							//printf("APTS? %X\n",(int)apts);
 						}
 
-						safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);	// not working yet ....
+#ifdef CONVERT_TO_DVB_COMPLIANT_DTS
+							unsigned short pes_len = (buf[14 + 4] << 8 | buf[14 + 5]);
+							pes_len -= 4;	// strip first 4 bytes of pes payload
+							buf[14 + 4] = pes_len >> 8;	// patch pes len
+							buf[15 + 4] = pes_len & 0xFF;
+
+							safe_write(ddvd_ac3_fd, buf + 14, 9 + buf[14 + 8]);	// write pes_header
+							safe_write(ddvd_ac3_fd, buf + 14 + 9 + buf[14 + 8] + 4, pes_len - (3 + buf[14 + 8]));	// write pes_payload
+#else
+							safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);
+#endif
 					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x80 + audio_id) {	// ac3 audio
 						if (audio_type != DDVD_AC3) {
 							//printf("Switch to AC3 Audio\n");

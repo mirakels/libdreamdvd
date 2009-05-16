@@ -31,6 +31,7 @@
 #define SHOW_START_SCREEN 1
 
 #define CONVERT_TO_DVB_COMPLIANT_AC3
+#define CONVERT_TO_DVB_COMPLIANT_DTS
 
 #include <fcntl.h>
 #include <stdio.h>
