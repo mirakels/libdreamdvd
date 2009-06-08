@@ -376,6 +376,26 @@ void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info)
 	memcpy(&resume_info->spu_lock, &pconfig->resume_spu_lock, sizeof(pconfig->resume_spu_lock));
 }
 
+struct ddvd_spu_return merge(struct ddvd_spu_return a, struct ddvd_spu_return b)
+{
+	struct ddvd_spu_return r;
+	r = b;
+	
+	if (a.x_start !=  a.x_end || a.y_start != a.y_end)
+	{
+			/* union old and new area */
+		if (a.x_start < r.x_start)
+			r.x_start = a.x_start;
+		if (a.y_start < r.y_start)
+			r.y_start = a.y_start;
+		if (a.x_end > r.x_end)
+			r.x_end = a.x_end;
+		if (a.y_end > r.y_end)
+			r.y_end = a.y_end;
+	}
+	return r;
+}
+
 // the main player loop
 enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 {
@@ -851,11 +871,10 @@ send_message:
 			if (ddvd_spu_timer_active) {
 				if (ddvd_spu_timer_end <= ddvd_get_time()) {
 					ddvd_spu_timer_active = 0;
+						/* the last_spu bbox is still filled with the correct value, no need to blit full screen */
+						/* TODO: only clear part of backbuffer */
 					memset(ddvd_lbb, 0, 720 * 576);	//clear SPU backbuffer
-					//last_spu_return.x_start = last_spu_return.y_start = 0;
-					//last_spu_return.x_end = last_spu_return.y_end = 0;
 					ddvd_lbb_changed = 1;
-					//printf("spu timer done\n");
 				}
 			}
 
@@ -1683,6 +1702,8 @@ send_message:
 #else
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
 			perror("VIDEO_GET_PTS");
+//		printf("pts %d, dvd_spu_backnr = %d, spu_backpts = %d\n", 
+//			(int)pts, (int)ddvd_spu_backnr, (int) spu_backpts[0]);
 		if (ddvd_spu_backnr > 0 && pts >= spu_backpts[0])
 #endif
 		{
@@ -1690,22 +1711,21 @@ send_message:
 			
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
 			int whole_screen = 0;
-			if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
+			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
 				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
-				whole_screen = 1;
-			}
+					/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
 			
 			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer .. 
-			last_spu_return = ddvd_spu_decode_data(spu_backbuffer, tmplen);	// decode
+//			printf("[SPU] previous bbox: %d %d %d %d\n",
+//				last_spu_return.x_start, last_spu_return.x_end, 
+//				last_spu_return.y_start, last_spu_return.y_end);
+			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(spu_backbuffer, tmplen));	// decode
+//			printf("[SPU] merged   bbox: %d %d %d %d\n",
+//				last_spu_return.x_start, last_spu_return.x_end, 
+//				last_spu_return.y_start, last_spu_return.y_end);
 			ddvd_display_time = last_spu_return.display_time;
 			ddvd_lbb_changed = 1;
 			
-			if (whole_screen) {
-				last_spu_return.x_start = last_spu_return.x_start = 0;
-				last_spu_return.x_end = 719;
-				last_spu_return.y_end = 575;
-			}
-
 			struct ddvd_color colneu;
 			int ctmp;
 			msg = DDVD_COLORTABLE_UPDATE;
@@ -1726,6 +1746,8 @@ send_message:
 			spu_backpts[1] = spu_backpts[2];
 			ddvd_spu_backnr--;
 			ddvd_spu_backptr -= tmplen;
+			
+//			printf("[SPU] backnr = %d, backptr = %d\n", ddvd_spu_backnr, ddvd_spu_backptr);
 
 			// set timer
 			if (ddvd_display_time > 0) {
@@ -2156,12 +2178,22 @@ key_play:
 			blit_area.x_end = last_spu_return.x_end;
 			blit_area.y_start = last_spu_return.y_start;
 			blit_area.y_end = last_spu_return.y_end;
+			if (!ddvd_spu_timer_active)
+			{
+					/* in case this is the last action for this subtitle's bbox (i.e. no timer has been set), then we will clear the bbox.
+					   otherwise, we will leave it there, so it will be contained in the next update as well. */
+				last_spu_return.x_start = last_spu_return.x_end = 0;
+				last_spu_return.y_start = last_spu_return.y_end = 0;
+			}
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ?  ( ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : (int)(ddvd_screeninfo_yres*1.21 - ddvd_screeninfo_yres)>>1 ) : 0; // correct 16:9 letterbox overlay
 			uint64_t start=ddvd_get_time();
 			if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
+			{
+//				printf("resizing.. (x=%d y=%d %d %d, %d)\n", x_offset, y_offset, y_source, ddvd_screeninfo_yres, ddvd_screeninfo_xres );
 				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+			}
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
@@ -2169,6 +2201,7 @@ key_play:
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
 			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+			
 			msg = msg_old;
 			ddvd_lbb_changed = 0;		
 		}
