@@ -66,7 +66,9 @@ int ddvd_get_messagepipe_fd(struct ddvd *pconfig);
 // xres, yres-> screen resolution, normally 720x576 libdreamdvd will scale inside to the given resolution
 // bypp-> bytes per pixel, only 1 (8bit) or 4 (32bit argb) is supported
 // stride-> line length in bytes, normally xres*bypp but not always like on the DM7025 framebuffer
+// canscale-> caller supports ddvd_get_blit_destination
 void ddvd_set_lfb(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride);
+void ddvd_set_lfb_ex(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride, int canscale);
 
 // set path to a dvd block device, a dvd file structure or an dvd iso-file ("/dev/dvd" ...)
 void ddvd_set_dvd_path(struct ddvd *pconfig, const char *path);
@@ -123,6 +125,10 @@ void ddvd_get_last_colortable(struct ddvd*pconfig, void *colortable);
 
 // get last area to update overlay after DDVD_SCREEN_UPDATE
 void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int *y_start, int *y_end);
+
+#define DDVD_SUPPORTS_GET_BLIT_DESTINATION 1
+// get parameters used for blit
+void ddvd_get_blit_destination(struct ddvd *pconfig, int *x_offset, int *y_offset, int *width, int *height);
 
 // get last received playing time
 // struct ddvd_time timestamp

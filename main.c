@@ -183,11 +183,17 @@ void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info)
 // set framebuffer options
 void ddvd_set_lfb(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride)
 {
+	return ddvd_set_lfb_ex(pconfig, lfb, xres, yres, bypp, stride, 0);
+}
+
+void ddvd_set_lfb_ex(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride, int canscale)
+{
 	pconfig->lfb = lfb;
 	pconfig->xres = xres;
 	pconfig->yres = yres;
 	pconfig->stride = stride;
 	pconfig->bypp = bypp;
+	pconfig->canscale = canscale;
 }
 
 // set path to dvd block device or file structure/iso
@@ -310,6 +316,16 @@ void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int
 	memcpy(x_end, &ptr->x_end, sizeof(int));
 	memcpy(y_start, &ptr->y_start, sizeof(int));
 	memcpy(y_end, &ptr->y_end, sizeof(int));
+}
+
+void ddvd_get_blit_destination(struct ddvd *pconfig, int *x_offset, int *y_offset, int *width, int *height)
+{
+	struct ddvd_resize_return *ptr = &pconfig->blit_area;
+
+	*x_offset = ptr->x_offset;
+	*y_offset = ptr->y_offset;
+	*width = ptr->width;
+	*height = ptr->height;
 }
 
 // get angle info
@@ -466,7 +482,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		goto err_malloc;
 	}
 
-	spu_backbuffer = malloc(3 * 2 * (128 * 1024));
+	spu_backbuffer = malloc(NUM_SPU_BACKBUFFER * 2 * (128 * 1024));
 	if (spu_backbuffer == NULL) {
 		perror("malloc");
 		res = DDVD_NOMEM;
@@ -480,6 +496,10 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	blit_area.x_start = blit_area.y_start = 0;
 	blit_area.x_end = ddvd_screeninfo_xres - 1;
 	blit_area.y_end = ddvd_screeninfo_yres - 1;
+	blit_area.x_offset = 0;
+	blit_area.y_offset = 0;
+	blit_area.width = ddvd_screeninfo_xres;
+	blit_area.height = ddvd_screeninfo_yres;
 	
 	msg = DDVD_SCREEN_UPDATE;
 	safe_write(message_pipe, &msg, sizeof(int));
@@ -706,7 +726,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 	ddvd_lbb_changed = 0;
 
-	unsigned long long spu_backpts[3];
+	unsigned long long spu_backpts[NUM_SPU_BACKBUFFER];
 
 	ddvd_play_empty(FALSE);
 	ddvd_get_time();	//set timestamp
@@ -1245,13 +1265,15 @@ send_message:
 
 						if (ddvd_spu_ptr >= (spu_buffer[0] << 8 | spu_buffer[1]))	// SPU packet complete ?
 						{
-							if (ddvd_spu_backnr == 3)	// backbuffer already full ?
+							if (ddvd_spu_backnr == NUM_SPU_BACKBUFFER)	// backbuffer already full ?
 							{
+								printf("dropped SPU frame\n");
 								int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 								memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete oldest SPU packet
-								spu_backpts[0] = spu_backpts[1];
-								spu_backpts[1] = spu_backpts[2];
-								ddvd_spu_backnr = 2;
+								int i;
+								for (i = 0; i < NUM_SPU_BACKBUFFER - 1; ++i)
+									spu_backpts[i] = spu_backpts[i + 1];
+								ddvd_spu_backnr = NUM_SPU_BACKBUFFER - 1;
 								ddvd_spu_backptr -= tmplen;
 							}
 
@@ -1520,8 +1542,27 @@ send_message:
 						int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 						int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ?  ( ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : (int)(ddvd_screeninfo_yres*1.21 - ddvd_screeninfo_yres)>>1 ) : 0; // correct 16:9 letterbox overlay
 						uint64_t start=ddvd_get_time();
-						if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
+						int resized = 0;
+
+						if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
+						{
+//							printf("resizing\n");
+							resized = 1;
 							blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+						}
+
+						blit_area.width = ddvd_screeninfo_xres;
+						blit_area.height = ddvd_screeninfo_yres;
+
+						if (resized)
+						{
+							blit_area.x_offset = 0;
+							blit_area.y_offset = 0;
+						} else
+						{
+							blit_area.x_offset = x_offset;
+							blit_area.y_offset = y_offset;
+						}
 						memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 						//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 						//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
@@ -1742,8 +1783,10 @@ send_message:
 			msg = DDVD_NULL;
 
 			memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete SPU packet
-			spu_backpts[0] = spu_backpts[1];
-			spu_backpts[1] = spu_backpts[2];
+			int i;
+			for (i = 0; i < NUM_SPU_BACKBUFFER - 1; ++i)
+				spu_backpts[i] = spu_backpts[i + 1];
+				
 			ddvd_spu_backnr--;
 			ddvd_spu_backptr -= tmplen;
 			
@@ -1844,6 +1887,10 @@ send_message:
 					blit_area.x_start = blit_area.y_start = 0;
 					blit_area.x_end = ddvd_screeninfo_xres - 1;
 					blit_area.y_end = ddvd_screeninfo_yres - 1;
+					blit_area.x_offset = 0;
+					blit_area.y_offset = 0;
+					blit_area.width = ddvd_screeninfo_xres;
+					blit_area.height = ddvd_screeninfo_yres;
 					msg = DDVD_SCREEN_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
@@ -2189,12 +2236,29 @@ key_play:
 			int x_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN) ? (int)(ddvd_screeninfo_xres - ddvd_screeninfo_xres/1.33)>>1 : 0; // correct 16:9 panscan (pillarbox) overlay
 			int y_offset = (dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX) ?  ( ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres*1.16 - ddvd_screeninfo_yres)>>1 : (int)(ddvd_screeninfo_yres*1.21 - ddvd_screeninfo_yres)>>1 ) : 0; // correct 16:9 letterbox overlay
 			uint64_t start=ddvd_get_time();
-			if (x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720)
+			int resized = 0;
+			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
 			{
 //				printf("resizing.. (x=%d y=%d %d %d, %d)\n", x_offset, y_offset, y_source, ddvd_screeninfo_yres, ddvd_screeninfo_xres );
 				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+				resized = 1;
 			}
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
+
+			if (resized)
+			{
+				blit_area.x_offset = 0;
+				blit_area.y_offset = 0;
+				blit_area.width = 720;
+				blit_area.height = 576;
+			} else
+			{
+				blit_area.x_offset = x_offset;
+				blit_area.y_offset = y_offset;
+				blit_area.width = ddvd_screeninfo_xres;
+				blit_area.height = ddvd_screeninfo_yres;
+			}
+
 			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
 			int msg_old = msg;	// save and restore msg it may not be empty
@@ -2266,6 +2330,10 @@ err_open_output_fd:
 	blit_area.x_start = blit_area.y_start = 0;
 	blit_area.x_end = ddvd_screeninfo_xres - 1;
 	blit_area.y_end = ddvd_screeninfo_yres - 1;
+	blit_area.x_offset = 0;
+	blit_area.y_offset = 0;
+	blit_area.width = ddvd_screeninfo_xres;
+	blit_area.height = ddvd_screeninfo_yres;
 	memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);
 	msg = DDVD_SCREEN_UPDATE;
 	safe_write(message_pipe, &msg, sizeof(int));

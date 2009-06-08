@@ -33,6 +33,8 @@
 #define CONVERT_TO_DVB_COMPLIANT_AC3
 #define CONVERT_TO_DVB_COMPLIANT_DTS
 
+#define NUM_SPU_BACKBUFFER 8
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,6 +133,8 @@ struct ddvd_resize_return {
 	int x_end;
 	int y_start;
 	int y_end;	
+	
+	int x_offset, y_offset, width, height;
 };
 
 // some global stuff 
@@ -184,6 +188,7 @@ struct ddvd {
 	int yres;						// y resolution of the framebuffer (normally 576, we dont scale inside libdreamdvd)
 	int stride;						// line_length of the framebuffer (normally 720*bypp, but not always like on DM7025)
 	int bypp;						// the bytes per pixel only 1 (8bit framebuffer) or 4 (32bit) are supported
+	int canscale;
 	int key_pipe[2];				// pipe for sending a command/remote control key (sizeof(int)) to the player
 	int message_pipe[2];			// pipe for getting player status, osd time and text as well as 8bit color tables
 	char *dvd_path;				// the path of a dvd block device ("/dev/dvd"), an iso-file ("/hdd/dvd.iso")
