@@ -598,7 +598,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 #endif
 #endif
 
-	int audio_type = DDVD_AC3;
+	int audio_type = DDVD_UNKNOWN;
 
 #if CONFIG_API_VERSION == 3
 	ddvd_set_pcr_offset();
@@ -647,22 +647,8 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int rccode;
 	int ismute = 0;
 
-	if (ac3thru) {
-		if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-			perror("AUDIO_SET_AV_SYNC");
-#ifdef CONVERT_TO_DVB_COMPLIANT_AC3
-		if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)	// AC3 (dvb compliant)
-#else
-		if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3) < 0)	// AC3 VOB
-#endif
-			perror("AUDIO_SET_BYPASS_MODE");
-	} else {
-		if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-			perror("AUDIO_SET_AV_SYNC");
-		if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-			perror("AUDIO_SET_BYPASS_MODE");
-	}
-
+	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+		perror("AUDIO_SET_AV_SYNC");
 #if CONFIG_API_VERSION == 1	
 	// set video system
 	int pal_ntsc = playerconfig->tv_system;
@@ -2305,12 +2291,8 @@ err_dvdnav_open:
 		perror("AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_DEMUX) < 0)
 		perror("AUDIO_SELECT_SOURCE");
-
 	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)	// restore AudioDecoder State
 		perror("AUDIO_SET_AV_SYNC");
-	if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-		perror("AUDIO_SET_BYPASS_MODE");
-
 	close(ddvd_ac3_fd);
 err_open_ac3_fd:
 	close(ddvd_fdaudio);

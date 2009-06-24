@@ -253,6 +253,7 @@ enum { // send_key
  */
 
 enum { // audio types
+	DDVD_UNKNOWN,
 	DDVD_AC3,
 	DDVD_MPEG,
 	DDVD_DTS,
