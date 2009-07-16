@@ -1540,8 +1540,6 @@ send_message:
 						uint64_t start=ddvd_get_time();
 						int resized = 0;
 
-						printf("dvd aspect %d\n", dvd_aspect);
-
 						if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
 						{
 //							printf("resizing\n");
