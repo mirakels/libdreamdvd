@@ -83,6 +83,7 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru);
 
 // set video options for aspect and the tv system, see enums for possible options
 void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_mode, int tv_system);
+void ddvd_set_video_ex(struct ddvd *pconfig, int aspect, int tv_mode, int tv_mode2, int tv_system);
 
 // set resume postion for dvd start
 void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info);
@@ -126,6 +127,7 @@ void ddvd_get_last_colortable(struct ddvd*pconfig, void *colortable);
 // get last area to update overlay after DDVD_SCREEN_UPDATE
 void ddvd_get_last_blit_area(struct ddvd *pconfig, int *x_start, int *x_end, int *y_start, int *y_end);
 
+#define DDVD_SUPPORTS_16_10_SCALING 1
 #define DDVD_SUPPORTS_GET_BLIT_DESTINATION 1
 // get parameters used for blit
 void ddvd_get_blit_destination(struct ddvd *pconfig, int *x_offset, int *y_offset, int *width, int *height);

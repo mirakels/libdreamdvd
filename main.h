@@ -181,6 +181,7 @@ struct ddvd {
 	char language[2]; 				// iso code (de, en, ...)
 	int aspect;						// 0-> 4:3 1-> 16:9 2-> 16:10
 	int tv_mode;					// 0-> letterbox 1-> pan_scan 2-> justscale
+	int tv_mode2;					// 0-> letterbox 1-> pan_scan 2-> justscale
 	int tv_system;					// 0-> PAL 1-> NTSC
 	int ac3thru;					// 0-> internal soft decoding 1-> ac3 pass thru to optical out
 	unsigned char *lfb;				// framebuffer to render subtitles and menus

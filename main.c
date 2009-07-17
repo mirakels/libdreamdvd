@@ -218,11 +218,18 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru)
 }
 
 // set video options
-void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_mode, int tv_system)
+void ddvd_set_video_ex(struct ddvd *pconfig, int aspect, int tv_mode, int tv_mode2, int tv_system)
 {
 	pconfig->aspect = aspect;
 	pconfig->tv_mode = tv_mode;
+	pconfig->tv_mode2 = tv_mode2;
 	pconfig->tv_system = tv_system;
+}
+
+// set video options
+void ddvd_set_video(struct ddvd *pconfig, int aspect, int tv_mode, int tv_system)
+{
+	ddvd_set_video_ex(pconfig, aspect, tv_mode, tv_mode, tv_system);
 }
 
 // send commands/keys to the main player
@@ -411,6 +418,57 @@ struct ddvd_spu_return merge(struct ddvd_spu_return a, struct ddvd_spu_return b)
 	}
 	return r;
 }
+
+static int calc_x_scale_offset(int dvd_aspect, int tv_mode, int tv_mode2, int tv_aspect)
+{
+	int x_offset=0;
+
+	if (dvd_aspect == 0 && tv_mode == DDVD_PAN_SCAN) {
+		switch (tv_aspect) {
+		case DDVD_16_10:
+			x_offset = (ddvd_screeninfo_xres - ddvd_screeninfo_xres * 12 / 15) / 2;  // correct 16:10 (broadcom 15:9) panscan (pillarbox) overlay
+			break;
+		case DDVD_16_9:
+			x_offset = (ddvd_screeninfo_xres - ddvd_screeninfo_xres * 3 / 4) / 2; // correct 16:9 panscan (pillarbox) overlay
+		default:
+			break;
+		}
+	}
+
+	if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_PAN_SCAN)
+		x_offset = -(ddvd_screeninfo_xres * 4 / 3 - ddvd_screeninfo_xres) / 2;
+
+	if (dvd_aspect >= 2 && tv_aspect == DDVD_16_10 && tv_mode2 == DDVD_PAN_SCAN)
+		x_offset = -(ddvd_screeninfo_xres * 16 / 15 - ddvd_screeninfo_xres) / 2;
+
+	return x_offset;
+}
+
+static int calc_y_scale_offset(int dvd_aspect, int tv_mode, int tv_mode2, int tv_aspect)
+{
+	int y_offset = 0;
+
+	if (dvd_aspect == 0 && tv_mode == DDVD_LETTERBOX) {
+		switch (tv_aspect) {
+		case DDVD_16_10:
+			y_offset = (ddvd_screeninfo_yres * 15 / 12 - ddvd_screeninfo_yres) / 2; // correct 16:10 (broacom 15:9) letterbox overlay
+			break;
+		case DDVD_16_9:
+			y_offset = (ddvd_screeninfo_yres * 4 / 3 - ddvd_screeninfo_yres) / 2; // correct 16:9 letterbox overlay
+		default:
+			break;
+		}
+	}
+
+	if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_LETTERBOX)
+		y_offset = -(ddvd_screeninfo_yres - ddvd_screeninfo_yres * 3 / 4) / 2;
+
+	if (dvd_aspect >= 2 && tv_aspect == DDVD_16_10 && tv_mode2 == DDVD_LETTERBOX)
+		y_offset = -(ddvd_screeninfo_yres - ddvd_screeninfo_yres * 15 / 16) / 2;
+
+	return y_offset;
+}
+
 
 // the main player loop
 enum ddvd_result ddvd_run(struct ddvd *playerconfig)
@@ -628,6 +686,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 	int tv_aspect = playerconfig->aspect;	//0-> 4:3 lb 1-> 4:3 ps 2-> 16:9 3-> always 16:9
 	int tv_mode = playerconfig->tv_mode;
+	int tv_mode2 = playerconfig->tv_mode2; // just used when tv_aspect is 16:10 and dvd_aspect is 16:9
 	int dvd_aspect = 0;	//0-> 4:3 2-> 16:9
 	int dvd_scale_perm = 0;
 	int tv_scale = 0;	//0-> off 1-> letterbox 2-> panscan
@@ -923,7 +982,8 @@ send_message:
 #endif
 						// if we have 16:9 Zoom Mode on the DVD and we use a "always 16:9" mode on tv we have
 						// to patch the mpeg header and the Sequence Display Extension inside the Stream in some cases
-						if (dvd_aspect == 3 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) {
+						if (dvd_aspect == 3 && ((tv_aspect == DDVD_16_9 && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) ||
+						    (tv_aspect == DDVD_16_10 && (tv_mode2 == DDVD_PAN_SCAN || tv_mode2 == DDVD_LETTERBOX)))) {
 							int z=0;
 							for (z=0; z<2040; z++)
 							{
@@ -1525,17 +1585,8 @@ send_message:
 					else
 					{
 						int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
-						int x_offset = dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN ?
-							(ddvd_screeninfo_xres - ddvd_screeninfo_xres * 3 / 4) / 2 : 0; // correct 16:9 panscan (pillarbox) overlay
-						int y_offset = dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX ?
-							ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres * 1.16 - ddvd_screeninfo_yres) / 2 :
-								(ddvd_screeninfo_yres * 4 / 3 - ddvd_screeninfo_yres) / 2 : 0; // correct 16:9 letterbox overlay
-
-						if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_LETTERBOX)
-							y_offset = -(ddvd_screeninfo_yres - ddvd_screeninfo_yres * 3 / 4) / 2;
-
-						if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_PAN_SCAN)
-							x_offset = -(ddvd_screeninfo_xres * 4 / 3 - ddvd_screeninfo_xres) / 2;
+						int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+						int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
 
 						uint64_t start=ddvd_get_time();
 						int resized = 0;
@@ -2230,16 +2281,8 @@ key_play:
 			}
 
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
-			int x_offset = dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_PAN_SCAN ?
-				(ddvd_screeninfo_xres - ddvd_screeninfo_xres * 3 / 4) / 2 : 0; // correct 16:9 panscan (pillarbox) overlay
-			int y_offset = dvd_aspect == 0 && (tv_aspect == DDVD_16_9 || tv_aspect == DDVD_16_10) && tv_mode == DDVD_LETTERBOX ?
-				ddvd_screeninfo_yres > 576 ? (int)(ddvd_screeninfo_yres * 1.16 - ddvd_screeninfo_yres) / 2 :
-					(ddvd_screeninfo_yres * 4 / 3 - ddvd_screeninfo_yres) / 2 : 0; // correct 16:9 letterbox overlay
-
-			if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_LETTERBOX)
-				y_offset = -(ddvd_screeninfo_yres - ddvd_screeninfo_yres * 3 / 4) / 2;
-			if (dvd_aspect >= 2 && tv_aspect == DDVD_4_3 && tv_mode == DDVD_PAN_SCAN)
-				x_offset = -(ddvd_screeninfo_xres * 4 / 3 - ddvd_screeninfo_xres) / 2;
+			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
 
 			uint64_t start=ddvd_get_time();
 			int resized = 0;
@@ -2442,8 +2485,8 @@ static int ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect, 
 			tv_scale = 2; // pan_scan spu
 		if (tv_aspect == DDVD_4_3 && tv_mode == DDVD_LETTERBOX)
 			tv_scale = 1; // letterbox spu
-	} 
-	
+	}
+
 	return tv_scale;
 }
 
