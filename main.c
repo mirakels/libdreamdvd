@@ -961,6 +961,8 @@ send_message:
 						audio_format[stream_type - 0xA0] = DDVD_LPCM;
 
 					if ((buf[14 + 3] & 0xF0) == 0xE0) {	// video
+						int pes_len = ((buf[14+4]<<8)|buf[14+5]) + 6;
+						int padding = len - (14 + pes_len);
 						if (buf[14 + 7] & 128) {
 							/* damn gcc bug */
 							vpts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
@@ -1003,7 +1005,7 @@ send_message:
 								buf[36 + 7] = (buf[36 + 7] & 0xF) + 0x30;
 							}
 						}
-				
+
 						// check yres for detecting ntsc/pal
 						if (ddvd_have_ntsc == -1) {
 							if ((buf[33] == 0 && buf[33 + 1] == 0 && buf[33 + 2] == 1 && buf[33 + 3] == 0xB3 && ((buf[33+5] & 0xF) << 8) + buf[33+6] == 0x1E0) 
@@ -1013,7 +1015,15 @@ send_message:
 								ddvd_have_ntsc = 0;
 						}
 
-						safe_write(ddvd_output_fd, buf + 14, 2048 - 14);
+						if (padding > 8) {
+							memcpy(buf+14+pes_len, "\x00\x00\x01\xE0\x00\x00\x80\x00\x00", 9);
+							pes_len += 9;
+						}
+
+						safe_write(ddvd_output_fd, buf + 14, pes_len);
+
+						if (padding && padding < 9)
+							safe_write(ddvd_output_fd, "\x00\x00\x01\xE0\x00\x00\x80\x00\x00", 9);
 
 						// 14+8 header_length
 						// 14+(header_length)+3  -> start mpeg header
