@@ -1941,6 +1941,7 @@ send_message:
 					ddvd_wait_for_user = 0;
 					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 					memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
+					memset(ddvd_lbb2, 0, 720 * 576 * ddvd_screeninfo_bypp); //clear 2nd backbuffer
 					blit_area.x_start = blit_area.y_start = 0;
 					blit_area.x_end = ddvd_screeninfo_xres - 1;
 					blit_area.y_end = ddvd_screeninfo_yres - 1;
