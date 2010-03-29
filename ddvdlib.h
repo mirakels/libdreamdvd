@@ -165,6 +165,11 @@ void ddvd_get_title_string(struct ddvd*pconfig, char *title_string);
 // get last received position for resume
 void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info);
 
+#define DDVD_SUPPORTS_PICTURE_INFO 1
+void ddvd_get_last_size(struct ddvd *pconfig, int *width, int *height, int *aspect);
+void ddvd_get_last_framerate(struct ddvd *pconfig, int *frate);
+void ddvd_get_last_progressive(struct ddvd *pconfig, int *progressive);
+
 /* 
  * functions for clean up AFTER the player had stopped
  */
@@ -201,6 +206,9 @@ enum { // state
 	DDVD_MENU_OPENED,
 	DDVD_MENU_CLOSED,
 	DDVD_SHOWOSD_ANGLE,			// show angle info, you can get it with ddvd_get_angle_info	
+	DDVD_SIZE_CHANGED,
+	DDVD_PROGRESSIVE_CHANGED,
+	DDVD_FRAMERATE_CHANGED,
 };
 
 

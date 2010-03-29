@@ -303,15 +303,23 @@ int ddvd_get_next_message(struct ddvd *pconfig, int blocked)
 		break;
 	case DDVD_SCREEN_UPDATE:
 		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->blit_area, sizeof(pconfig->blit_area), 1);
-		break;	
+		break;
 	case DDVD_SHOWOSD_ANGLE:
 		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->angle_current, sizeof(int), 1);
 		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->angle_num, sizeof(int), 1);
 		break;
+	case DDVD_SIZE_CHANGED:
+		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->last_size, sizeof(struct ddvd_size_evt), 1);
+		break;
+	case DDVD_PROGRESSIVE_CHANGED:
+		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->last_progressive, sizeof(struct ddvd_progressive_evt), 1);
+		break;
+	case DDVD_FRAMERATE_CHANGED:
+		ddvd_readpipe(pconfig->message_pipe[0], &pconfig->last_framerate, sizeof(struct ddvd_framerate_evt), 1);
+		break;
 	default:
 		break;
 	}
-
 	return res;
 }
 
@@ -399,6 +407,23 @@ void ddvd_get_resume_pos(struct ddvd *pconfig, struct ddvd_resume *resume_info)
 	memcpy(&resume_info->spu_lock, &pconfig->resume_spu_lock, sizeof(pconfig->resume_spu_lock));
 }
 
+void ddvd_get_last_size(struct ddvd *pconfig, int *width, int *height, int *aspect)
+{
+	*width = pconfig->last_size.width;
+	*height = pconfig->last_size.height;
+	*aspect = pconfig->last_size.aspect;
+}
+
+void ddvd_get_last_progressive(struct ddvd *pconfig, int *progressive)
+{
+	*progressive = pconfig->last_progressive.progressive;
+}
+
+void ddvd_get_last_framerate(struct ddvd *pconfig, int *framerate)
+{
+	*framerate = pconfig->last_framerate.framerate;
+}
+
 struct ddvd_spu_return merge(struct ddvd_spu_return a, struct ddvd_spu_return b)
 {
 	struct ddvd_spu_return r;
@@ -469,6 +494,45 @@ static int calc_y_scale_offset(int dvd_aspect, int tv_mode, int tv_mode2, int tv
 	return y_offset;
 }
 
+#if CONFIG_API_VERSION >= 3
+static int readMpegProc(char *str, int decoder)
+{
+	int val = -1;
+	char tmp[64];
+	sprintf(tmp, "/proc/stb/vmpeg/%d/%s", decoder, str);
+	FILE *f = fopen(tmp, "r");
+	if (f)
+	{
+		fscanf(f, "%x", &val);
+		fclose(f);
+	}
+	return val;
+}
+
+static int readApiSize(int fd, int *xres, int *yres, int *aspect)
+{
+	video_size_t size;
+	if (!ioctl(fd, VIDEO_GET_SIZE, &size))
+	{
+		*xres = size.w;
+		*yres = size.h;
+		*aspect = size.aspect_ratio == 0 ? 2 : 3;  // convert dvb api to etsi
+		return 0;
+	}
+	return -1;
+}
+
+static int readApiFrameRate(int fd, int *framerate)
+{
+	unsigned int frate;
+	if (!ioctl(fd, VIDEO_GET_FRAME_RATE, &frate))
+	{
+		*framerate = frate;
+		return 0;
+	}
+	return -1;
+}
+#endif
 
 // the main player loop
 enum ddvd_result ddvd_run(struct ddvd *playerconfig)
@@ -722,6 +786,28 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 			perror("SAAIOSENC");
 		close(saafd);
 	}
+#else
+	{
+		struct ddvd_size_evt evt;
+		int msg = DDVD_SIZE_CHANGED;
+		readApiSize(ddvd_fdvideo, &evt.width, &evt.height, &evt.aspect);
+		safe_write(message_pipe, &msg, sizeof(int));
+		safe_write(message_pipe, &evt, sizeof(evt));
+	}
+	{
+		struct ddvd_framerate_evt evt;
+		int msg = DDVD_FRAMERATE_CHANGED;
+		readApiFrameRate(ddvd_fdvideo, &evt.framerate);
+		safe_write(message_pipe, &msg, sizeof(int));
+		safe_write(message_pipe, &evt, sizeof(evt));
+	}
+	{
+		struct ddvd_progressive_evt evt;
+		int msg = DDVD_PROGRESSIVE_CHANGED;
+		evt.progressive = readMpegProc("progressive", 0);
+		safe_write(message_pipe, &msg, sizeof(int));
+		safe_write(message_pipe, &evt, sizeof(evt));
+	}
 #endif
 	
 	/* open dvdnav handle */
@@ -789,6 +875,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	 * and handles the returned events */
 	int reached_eof = 0;
 	int reached_sof = 0;
+
 	while (!finished) {
 		pci_t *pci = 0;
 		dsi_t *dsi = 0;
@@ -1802,6 +1889,42 @@ send_message:
 			perror("VIDEO_GET_PTS");
 //		printf("pts %d, dvd_spu_backnr = %d, spu_backpts = %d\n", 
 //			(int)pts, (int)ddvd_spu_backnr, (int) spu_backpts[0]);
+		struct video_event event;
+		if (!ioctl(ddvd_fdvideo, VIDEO_GET_EVENT, &event))
+		{
+			switch(event.type)
+			{
+			case VIDEO_EVENT_SIZE_CHANGED:
+			{
+				struct ddvd_size_evt evt;
+				int msg = DDVD_SIZE_CHANGED;
+				evt.width = event.u.size.w;
+				evt.height = event.u.size.h;
+				evt.aspect = event.u.size.aspect_ratio;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &evt, sizeof(evt));
+				break;
+			}
+			case VIDEO_EVENT_FRAME_RATE_CHANGED:
+			{
+				struct ddvd_framerate_evt evt;
+				int msg = DDVD_FRAMERATE_CHANGED;
+				evt.framerate = event.u.frame_rate;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &evt, sizeof(evt));
+				break;
+			}
+			case 16: // VIDEO_EVENT_PROGRESSIVE_CHANEGD
+			{
+				struct ddvd_progressive_evt evt;
+				int msg = DDVD_PROGRESSIVE_CHANGED;
+				evt.progressive = event.u.frame_rate;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &evt, sizeof(evt));
+				break;
+			}
+			}
+		}
 		if (ddvd_spu_backnr > 0 && pts >= spu_backpts[0])
 #endif
 		{

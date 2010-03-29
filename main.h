@@ -175,6 +175,21 @@ int ddvd_screeninfo_xres, ddvd_screeninfo_yres, ddvd_screeninfo_stride;
 
 unsigned short ddvd_rd[256],ddvd_gn[256],ddvd_bl[256],ddvd_tr[256];
 
+struct ddvd_size_evt {
+	int width;
+	int height;
+	int aspect;
+};
+
+struct ddvd_framerate_evt {
+	int framerate;
+};
+
+struct ddvd_progressive_evt {
+	int progressive;
+};
+
+
 /* struct for ddvd nav handle*/
 struct ddvd {
 	/* config options */
@@ -205,7 +220,11 @@ struct ddvd {
 	uint16_t last_audio_lang;		// active audio language
 	int last_spu_id;				// active subtitle id
 	uint16_t last_spu_lang;			// active subtitle language
+	struct ddvd_size_evt last_size;
+	struct ddvd_framerate_evt last_framerate;
+	struct ddvd_progressive_evt last_progressive;
 	uint64_t next_time_update;
+	
 	int in_menu;
 	int resume_title;				// title, chapter, block for resuming dvd or
 	int resume_chapter;				// getting actual resume position
