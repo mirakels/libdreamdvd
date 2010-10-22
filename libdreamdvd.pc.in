@@ -6,5 +6,5 @@ includedir=@includedir@
 Name: libdreamdvd
 Description: a wrapper library for libdvdnav
 Version: @VERSION@
-Libs: -L${libdir}
+Libs: -L${libdir} -ldreamdvd
 Cflags: -I${includedir}/dreamdvd
