@@ -24,8 +24,9 @@
  */
 
 #ifndef __MAIN_H__
-
 #define __MAIN_H__
+
+#include "libdreamdvd_config.h"
 
 // set to 1 if a start screen should be displayed
 #define SHOW_START_SCREEN 1
@@ -63,20 +64,14 @@
 #error "no BYTE_ORDER defined!!!!"
 #endif
 
-#if BYTE_ORDER == BIG_ENDIAN
-#warning "assume api v1 when byte order is big endian !!"
-#define CONFIG_API_VERSION 1
-#else
-#warning "assume api v3 when byte order is little endian !!"
-#define CONFIG_API_VERSION 3
-#endif
-
-#if CONFIG_API_VERSION == 1
-#include <ost/video.h>
-#include <ost/audio.h>
-#elif CONFIG_API_VERSION == 3
+#if defined(HAVE_LINUX_DVB_VERSION_H)
 #include <linux/dvb/video.h>
 #include <linux/dvb/audio.h>
+#define CONFIG_API_VERSION 3
+#elif defined(HAVE_OST_DMX_H)
+#include <ost/video.h>
+#include <ost/audio.h>
+#define CONFIG_API_VERSION 1
 #endif
 
 #define BUFFER_SIZE 4096
