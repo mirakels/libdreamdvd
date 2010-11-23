@@ -1,51 +1,33 @@
-AC_INIT([libdreamdvd],[0.0.1],[seddi@i-have-a-dreambox.com],[libdreamdvd])
-AM_INIT_AUTOMAKE([dist-bzip2])
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
 
-AC_PROG_CXX
-AC_PROG_LIBTOOL
-AC_CHECK_HEADERS([byteswap.h endian.h])
+AC_INIT([libdreamdvd],[0.0.1],[enigma2-devel@lists.elitedvb.net])
+AM_INIT_AUTOMAKE([dist-bzip2 foreign])
+AC_CONFIG_SRCDIR([main.c])
+AC_CONFIG_HEADERS([libdreamdvd_config.h])
 
-AC_ARG_WITH(dvbincludes,
-	[  --with-dvbincludes=PATH  path for dvb includes [[NONE]]],
-	[DVBINCLUDES="$withval"],[DVBINCLUDES=""])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-if test "$DVBINCLUDES"; then
-	CPPFLAGS="$CPPFLAGS -I$DVBINCLUDES"
-fi
+AC_USE_SYSTEM_EXTENSIONS
+AC_SYS_LARGEFILE
 
-AC_CHECK_HEADERS(ost/dmx.h,[
-	DVB_API_VERSION=1
-	AC_MSG_NOTICE([found dvb version 1])
-])
+# Checks for programs.
+AC_PROG_CC
+m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
+AC_CONFIG_MACRO_DIR([m4])
 
-if test -z "$DVB_API_VERSION"; then
-AC_CHECK_HEADERS(linux/dvb/version.h,[
-	AC_LANG_PREPROC_REQUIRE()
-	AC_REQUIRE([AC_PROG_EGREP])
-	AC_LANG_CONFTEST([AC_LANG_SOURCE([[
-#include <linux/dvb/version.h>
-version DVB_API_VERSION
-	]])])
-	DVB_API_VERSION=`(eval "$ac_cpp conftest.$ac_ext") 2>&AS_MESSAGE_LOG_FD | $EGREP "^version" | sed "s,version\ ,,"`
-	rm -f conftest*
+# Checks for libraries.
+PKG_CHECK_MODULES(DVDNAV, dvdnav)
+AC_CHECK_LIB([dl], [dlopen], [LIBDL_LIBS="-ldl"], [AC_MSG_ERROR([Could not find libdl])])
+AC_SUBST(LIBDL_LIBS)
+AC_CHECK_LIB([m], [pow], [LIBM_LIBS="-lm"], [AC_MSG_ERROR([Could not find libm])])
+AC_SUBST(LIBM_LIBS)
 
-	AC_MSG_NOTICE([found dvb version $DVB_API_VERSION])
-])
-fi
+# Checks for header files.
+AC_CHECK_HEADERS([byteswap.h ost/dmx.h linux/dvb/version.h])
 
-PKG_CHECK_MODULES(LIBDVDNAV, dvdnav, HAVE_LIBDVDNAV="yes", HAVE_LIBDVDNAV="no")
-AM_CONDITIONAL(HAVE_LIBDVDNAV, test "$HAVE_LIBDVDNAV" = "yes")
-PKG_CHECK_MODULES(LIBDVDREAD, dvdread, HAVE_LIBDVDREAD="yes", HAVE_LIBDVDREAD="no")
-AM_CONDITIONAL(HAVE_LIBDVDREAD, test "$HAVE_LIBDVDREAD" = "yes")
-
-if test "$DVB_API_VERSION"; then
-	AC_DEFINE(HAVE_DVB,1,[Define to 1 if you have the dvb includes])
-	AC_DEFINE_UNQUOTED(HAVE_DVB_API_VERSION,$DVB_API_VERSION,[Define to the version of the dvb api])
-else
-	AC_MSG_ERROR([can't find dvb headers])
-fi
-
-AC_OUTPUT([
+AC_CONFIG_FILES([
 Makefile
 libdreamdvd.pc
 ])
+AC_OUTPUT
