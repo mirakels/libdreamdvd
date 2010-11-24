@@ -7,4 +7,5 @@ Name: libdreamdvd
 Description: a wrapper library for libdvdnav
 Version: @VERSION@
 Libs: -L${libdir} -ldreamdvd
+Requires.private: dvdnav dvdread
 Cflags: -I${includedir}/dreamdvd
