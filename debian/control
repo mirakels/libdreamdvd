@@ -1,0 +1,23 @@
+Source: libdreamdvd
+Priority: extra
+Maintainer: Andreas Oberritter <obi@opendreambox.org>
+Build-Depends: debhelper (>= 7.0.50~), libdvdnav-dev
+Standards-Version: 3.8.4
+Section: libs
+Homepage: https://schwerkraft.elitedvb.net/projects/libdreamdvd/
+Vcs-Git: git://schwerkraft.elitedvb.net/libdreamdvd/libdreamdvd.git
+Vcs-Browser: https://schwerkraft.elitedvb.net/scm/browser.php?group_id=16
+
+Package: libdreamdvd-dev
+Section: libdevel
+Architecture: any
+Depends: libdreamdvd0 (= ${binary:Version})
+Description: libdvdnav wrapper for Dream Multimedia STBs (development files)
+ libdvdnav wrapper for Dream Multimedia STBs (development files)
+
+Package: libdreamdvd0
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: libdvdnav wrapper for Dream Multimedia STBs
+ libdvdnav wrapper for Dream Multimedia STBs

@@ -1,0 +1,51 @@
+This work was packaged for Debian by:
+
+    Andreas Oberritter <obi@opendreambox.org> on Tue, 23 Nov 2010 19:37:09 +0100
+
+It was downloaded from:
+
+    https://schwerkraft.elitedvb.net/scm/browser.php?group_id=16
+
+Upstream Author(s):
+
+    Andreas Monzner <andreas.monzner@multimedia-labs.de>
+    Andreas Oberritter <obi@opendreambox.org>
+    Sven Karschewski <seddi@users.schwerkraft.elitedvb.net>
+    Felix Domke <tmbinc@elitedvb.net>
+
+Copyright:
+
+    Copyright (C) 2008-2010 Andreas Monzner
+    Copyright (C) 2008, 2010 Andreas Oberritter
+    Copyright (C) 2008-2010 Sven Karschewski
+    Copyright (C) 2009 Felix Domke
+
+License:
+
+    This package is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This package is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program. If not, see <http://www.gnu.org/licenses/>
+
+On Debian systems, the complete text of the GNU General
+Public License version 2 can be found in "/usr/share/common-licenses/GPL-2".
+
+The Debian packaging is:
+
+    Copyright (C) 2010 Andreas Oberritter <obi@opendreambox.org>
+
+you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+# Please also look if there are files or directories which have a
+# different copyright/license attached and list them here.
