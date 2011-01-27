@@ -99,6 +99,9 @@
 #define SAA_NTSC        0
 #define SAA_PAL         1
 
+#define MAX_AUDIO       8
+#define MAX_SPU         32
+
 typedef struct ddvd_spudec_clut_struct {
 #if BYTE_ORDER == BIG_ENDIAN
 	uint8_t	entry0	: 4;
@@ -232,6 +235,9 @@ struct ddvd {
 	struct ddvd_resize_return blit_area;
 	int angle_current;
 	int angle_num;
+
+	int audio_format[MAX_AUDIO];
+	int spu_map[MAX_SPU];
 };
 
 /* internal functions */

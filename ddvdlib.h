@@ -88,6 +88,12 @@ void ddvd_set_video_ex(struct ddvd *pconfig, int aspect, int tv_mode, int tv_mod
 // set resume postion for dvd start
 void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info);
 
+// directly set given audio stream id (alternative to iteration through the streams with the DDVD_KEY_AUDIO)
+void ddvd_set_audio(struct ddvd *pconfig, int audio_id);
+
+// directly set given subtitle stream id (alternative to iteration through the streams with the DDVD_KEY_SUBTITLE)
+void ddvd_set_spu(struct ddvd *pconfig, int spu_id);
+
 /* 
  * functions for starting the dvd player
  */
@@ -153,11 +159,23 @@ void ddvd_get_last_string(struct ddvd*pconfig, void *text);
 // int type -> audio type, see audio type enum (ac3,mpeg,...)
 void ddvd_get_last_audio(struct ddvd*pconfig, void *id, void *lang, void *type);
 
+// get audio track details for given audio track id
+void ddvd_get_audio_byid(struct ddvd *pconfig, int audio_id, void *lang, void *type);
+
+// get the number of available audio tracks
+void ddvd_get_audio_count(struct ddvd *pconfig, void *count);
+
 // get the active subtitle track
 // int id -> logical track number
 // uint16_t lang -> subtitle language in 2 letter iso code
 // id=-1 means no subtitle track active
 void ddvd_get_last_spu(struct ddvd*pconfig, void *id, void *lang);
+
+// get track details for given subtitle track id
+void ddvd_get_spu_byid(struct ddvd *pconfig, int spu_id, void *lang);
+
+// get the number of available subtitle tracks
+void ddvd_get_spu_count(struct ddvd *pconfig, void *count);
 
 // get dvd title string
 void ddvd_get_title_string(struct ddvd*pconfig, char *title_string);
@@ -249,8 +267,10 @@ enum { // send_key
 	DDVD_SET_MUTE,				// just telling dreamdvd that the sound has been muted, libdreamdvd does not mute for you, but has to know
 								// the mute state for sound handling on ffwd/fbwd trick mode
 	DDVD_UNSET_MUTE,			// sound is not muted any more (see DDVD_SET_MUTE)
-	DDVD_KEY_ANGLE,				// change angle on the fly 	
-	DDVD_GET_ANGLE,				// get actual angle info	
+	DDVD_KEY_ANGLE,				// change angle on the fly
+	DDVD_GET_ANGLE,				// get actual angle info
+	DDVD_SET_AUDIO,				// set given audio track id
+	DDVD_SET_SUBTITLE,			// set given subtitle track id
 };
 
 // if you use the same keys for different functions in different contexts (menu/movie) just send both commands, the player will 
