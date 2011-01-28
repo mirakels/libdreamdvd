@@ -229,7 +229,6 @@ void ddvd_set_video_ex(struct ddvd *pconfig, int aspect, int tv_mode, int tv_mod
 // set subtitle stream id
 void ddvd_set_spu(struct ddvd *pconfig, int spu_id)
 {
-	printf("***********ddvd_set_spu_id %i\n", spu_id);
 	ddvd_send_key(pconfig, DDVD_SET_SUBTITLE);
 	ddvd_send_key(pconfig, spu_id);
 }
@@ -237,7 +236,6 @@ void ddvd_set_spu(struct ddvd *pconfig, int spu_id)
 // set audio stream id
 void ddvd_set_audio(struct ddvd *pconfig, int audio_id)
 {
-	printf("***********ddvd_set_audio_id %i\n", audio_id);
 	ddvd_send_key(pconfig, DDVD_SET_AUDIO);
 	ddvd_send_key(pconfig, audio_id);
 }
@@ -393,15 +391,12 @@ void ddvd_get_last_string(struct ddvd *pconfig, void *text)
 // get the number of available audio tracks
 void ddvd_get_audio_count(struct ddvd *pconfig, void *count)
 {
-	printf("ddvd_get_audio_count\n");
 	int c = 0;
 	int i;
 	for ( i = 0; i < MAX_AUDIO; i++)
 	{
-		printf("i=%i pconfig->audio_format[i]=%i",i,pconfig->audio_format[i]);
 		if ( pconfig->audio_format[i] != -1 )
 			c++;
-		printf(" c=%i\n",c);
 	}
 	memcpy(count, &c, sizeof(int));
 }
@@ -437,7 +432,6 @@ void ddvd_get_last_spu(struct ddvd *pconfig, void *id, void *lang)
 // get the number of available subtitle tracks
 void ddvd_get_spu_count(struct ddvd *pconfig, void *count)
 {
-	printf("ddvd_get_spu_count\n");
 	int c = 0;
 	int i;
 	for ( i = 0; i < MAX_SPU; i++)
