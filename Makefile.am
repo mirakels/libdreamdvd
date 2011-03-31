@@ -1,5 +1,3 @@
-ACLOCAL_AMFLAGS = -I m4
-
 AM_CFLAGS = @DVDNAV_CFLAGS@
 
 lib_LTLIBRARIES = libdreamdvd.la

@@ -14,7 +14,6 @@ AC_SYS_LARGEFILE
 # Checks for programs.
 AC_PROG_CC
 m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
-AC_CONFIG_MACRO_DIR([m4])
 
 # Checks for libraries.
 PKG_CHECK_MODULES(DVDNAV, dvdnav)
