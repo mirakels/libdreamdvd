@@ -1260,15 +1260,19 @@ send_message:
 						safe_write(ddvd_ac3_fd, buf + 14, buf[19] + (buf[18] << 8) + 6);
 					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0xA0 + audio_id)	// lpcm audio
 					{
+						// autodetect bypass mode
+						static int lpcm_mode = -1;
+						if (lpcm_mode < 0) {
+							lpcm_mode = 6;
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, lpcm_mode) < 0)
+								lpcm_mode = 0;
+						}
+
 						if (audio_type != DDVD_LPCM) {
 							//printf("Switch to LPCM Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("AUDIO_SET_AV_SYNC");
-#ifdef HARDWARE_SUPPORT_LPCM
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 6) < 0)
-#else
-							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)
-#endif
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, lpcm_mode) < 0)
 								perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_LPCM;
 							ddvd_lpcm_count = 0;
@@ -1282,52 +1286,53 @@ send_message:
 							apts |= (buf[14 + 14] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
-#ifndef HARDWARE_SUPPORT_LPCM
-						int i = 0;
-						char abuf[(((buf[18] << 8) | buf[19]) - buf[22] - 14)];
-    #if BYTE_ORDER == BIG_ENDIAN
-						// just copy, byte order is correct on ppc machines
-						memcpy(abuf, buf + 14 + buf[14 + 8] + 9 + 7, (((buf[18] << 8) | buf[19]) - buf[22] - 14));
-						i = (((buf[18] << 8) | buf[19]) - buf[22] - 14);
-    #else
-						// byte swapping .. we become the wrong byteorder on lpcm on the 7025
-						while (i < (((buf[18] << 8) | buf[19]) - buf[22] - 14)) {
-							abuf[i + 0] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 1]);
-							abuf[i + 1] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 0]);
-							i += 2;
-						}
-    #endif
-						// we will encode the raw lpcm data to mpeg audio and send them with pts
-						// information to the decoder to get a sync. playing the pcm data via
-						// oss will break the pic/sound sync. So believe it or not, this is the 
-						// smartest way to get a synced lpcm track ;-)
-						if (ddvd_lpcm_count == 0) {	// save mpeg header with pts
-							memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
-							mpa_header_length = buf[14 + 8] + 9;
-						}
-						if (ddvd_lpcm_count + i >= 4608) {	//we have to send 4608 bytes to the encoder
-							memcpy(lpcm_data + ddvd_lpcm_count, abuf, 4608 - ddvd_lpcm_count);
-							//encode
-							mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length, 4608, lpcm_data);
-							//patch pes__packet_length
-							mpa_count = mpa_count + mpa_header_length - 6;
-							mpa_data[4] = mpa_count >> 8;
-							mpa_data[5] = mpa_count & 0xFF;
-							//patch header type to mpeg
-							mpa_data[3] = 0xC0;
-							//write
-							safe_write(ddvd_ac3_fd, mpa_data, mpa_count + mpa_header_length);
-							memcpy(lpcm_data, abuf + (4608 - ddvd_lpcm_count), i - (4608 - ddvd_lpcm_count));
-							ddvd_lpcm_count = i - (4608 - ddvd_lpcm_count);
-							memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
-							mpa_header_length = buf[14 + 8] + 9;
+
+						if (lpcm_mode == 0) {
+							int i = 0;
+							char abuf[(((buf[18] << 8) | buf[19]) - buf[22] - 14)];
+	    #if BYTE_ORDER == BIG_ENDIAN
+							// just copy, byte order is correct on ppc machines
+							memcpy(abuf, buf + 14 + buf[14 + 8] + 9 + 7, (((buf[18] << 8) | buf[19]) - buf[22] - 14));
+							i = (((buf[18] << 8) | buf[19]) - buf[22] - 14);
+	    #else
+							// byte swapping .. we become the wrong byteorder on lpcm on the 7025
+							while (i < (((buf[18] << 8) | buf[19]) - buf[22] - 14)) {
+								abuf[i + 0] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 1]);
+								abuf[i + 1] = (buf[14 + buf[14 + 8] + 9 + 7 + i + 0]);
+								i += 2;
+							}
+	    #endif
+							// we will encode the raw lpcm data to mpeg audio and send them with pts
+							// information to the decoder to get a sync. playing the pcm data via
+							// oss will break the pic/sound sync. So believe it or not, this is the 
+							// smartest way to get a synced lpcm track ;-)
+							if (ddvd_lpcm_count == 0) {	// save mpeg header with pts
+								memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
+								mpa_header_length = buf[14 + 8] + 9;
+							}
+							if (ddvd_lpcm_count + i >= 4608) {	//we have to send 4608 bytes to the encoder
+								memcpy(lpcm_data + ddvd_lpcm_count, abuf, 4608 - ddvd_lpcm_count);
+								//encode
+								mpa_count = ddvd_mpa_encode_frame(mpa_data + mpa_header_length, 4608, lpcm_data);
+								//patch pes__packet_length
+								mpa_count = mpa_count + mpa_header_length - 6;
+								mpa_data[4] = mpa_count >> 8;
+								mpa_data[5] = mpa_count & 0xFF;
+								//patch header type to mpeg
+								mpa_data[3] = 0xC0;
+								//write
+								safe_write(ddvd_ac3_fd, mpa_data, mpa_count + mpa_header_length);
+								memcpy(lpcm_data, abuf + (4608 - ddvd_lpcm_count), i - (4608 - ddvd_lpcm_count));
+								ddvd_lpcm_count = i - (4608 - ddvd_lpcm_count);
+								memcpy(mpa_data, buf + 14, buf[14 + 8] + 9);
+								mpa_header_length = buf[14 + 8] + 9;
+							} else {
+								memcpy(lpcm_data + ddvd_lpcm_count, abuf, i);
+								ddvd_lpcm_count += i;
+							}
 						} else {
-							memcpy(lpcm_data + ddvd_lpcm_count, abuf, i);
-							ddvd_lpcm_count += i;
+							safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
 						}
-#else
-						safe_write(ddvd_ac3_fd, buf+14 , buf[19]+(buf[18]<<8)+6);
-#endif
 					} else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x88 + audio_id) {	// dts audio
 						if (audio_type != DDVD_DTS) {
 							//printf("Switch to DTS Audio (thru)\n");
