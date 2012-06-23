@@ -1132,7 +1132,7 @@ send_message:
 							vpts |= buf[14 + 10] << 22;
 							vpts |= (buf[14 + 11] >> 1) << 15;
 							vpts |= buf[14 + 12] << 7;
-							vpts |= (buf[14 + 14] >> 1);
+							vpts |= (buf[14 + 13] >> 1);
 							//printf("VPTS? %X\n",(int)vpts);
 						}
 #if CONFIG_API_VERSION == 1
@@ -1262,7 +1262,7 @@ send_message:
 							apts |= buf[14 + 10] << 22;
 							apts |= (buf[14 + 11] >> 1) << 15;
 							apts |= buf[14 + 12] << 7;
-							apts |= (buf[14 + 14] >> 1);
+							apts |= (buf[14 + 13] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
 
@@ -1292,7 +1292,7 @@ send_message:
 							apts |= buf[14 + 10] << 22;
 							apts |= (buf[14 + 11] >> 1) << 15;
 							apts |= buf[14 + 12] << 7;
-							apts |= (buf[14 + 14] >> 1);
+							apts |= (buf[14 + 13] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
 
@@ -1362,7 +1362,7 @@ send_message:
 							apts |= buf[14 + 10] << 22;
 							apts |= (buf[14 + 11] >> 1) << 15;
 							apts |= buf[14 + 12] << 7;
-							apts |= (buf[14 + 14] >> 1);
+							apts |= (buf[14 + 13] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
 
@@ -1404,7 +1404,7 @@ send_message:
 							apts |= buf[14 + 10] << 22;
 							apts |= (buf[14 + 11] >> 1) << 15;
 							apts |= buf[14 + 12] << 7;
-							apts |= (buf[14 + 14] >> 1);
+							apts |= (buf[14 + 13] >> 1);
 							//printf("APTS? %X\n",(int)apts);
 						}
 
@@ -1476,13 +1476,13 @@ send_message:
 							spts |= buf[14 + 10] << 22;
 							spts |= (buf[14 + 11] >> 1) << 15;
 							spts |= buf[14 + 12] << 7;
-							spts |= (buf[14 + 14] >> 1);
+							spts |= (buf[14 + 13] >> 1);
 #else
 							spts = (buf[14 + 9] >> 1) << 29;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
 							spts |= buf[14 + 10] << 21;
 							spts |= (buf[14 + 11] >> 1) << 14;
 							spts |= buf[14 + 12] << 6;
-							spts |= buf[14 + 12] >> 2;
+							spts |= buf[14 + 13] >> 2;
 #endif
 							//printf("SPTS? %X\n",(int)spts);
 						}
