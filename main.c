@@ -1543,8 +1543,7 @@ send_message:
 				break;
 
 			case DVDNAV_SPU_CLUT_CHANGE:
-				/* We received a new color lookup table so we read and store
-				 * it */
+				/* We received a new color lookup table so we read and store it */
 				{
 					int i = 0, i2 = 0;
 					uint8_t pal[16 * 4];
@@ -1632,7 +1631,7 @@ send_message:
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &report_spu, sizeof(int));
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
-				//printf("SPU Stream change: w %X l: %X p: %X active: %X\n",ev->physical_wide,ev->physical_letterbox,ev->physical_pan_scan,spu_active_id);
+				//printf("SPU Stream change: w %X l: %X p: %X active: %X\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan,spu_active_id);
 				break;
 
 			case DVDNAV_AUDIO_STREAM_CHANGE:
@@ -1650,7 +1649,6 @@ send_message:
 					dvdnav_highlight_event_t *highlight_event = (dvdnav_highlight_event_t *) buf;
 
 					pci = dvdnav_get_current_nav_pci(dvdnav);
-					dsi = dvdnav_get_current_nav_dsi(dvdnav);
 					dvdnav_highlight_area_t hl;
 					
 					memcpy(&blit_area,&last_blit_area,sizeof(struct ddvd_resize_return));
@@ -1825,7 +1823,7 @@ send_message:
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
 					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect, tv_mode);
-					//printf("DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n",dvd_aspect,tv_aspect,tv_scale,dvd_scale_perm);
+					//printf("DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n", dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm);
 					
 					// resuming a dvd ?
 					if (playerconfig->should_resume && first_vts_change) {
@@ -1833,7 +1831,8 @@ send_message:
 						int title_numbers,part_numbers;
 						dvdnav_get_number_of_titles(dvdnav, &title_numbers);
 						dvdnav_get_number_of_parts(dvdnav, playerconfig->resume_title, &part_numbers);
-						if (playerconfig->resume_title <= title_numbers && playerconfig->resume_title > 0 && playerconfig->resume_chapter <= part_numbers && playerconfig->resume_chapter > 0) {
+						if (playerconfig->resume_title <= title_numbers && playerconfig->resume_title > 0 &&
+							playerconfig->resume_chapter <= part_numbers && playerconfig->resume_chapter > 0) {
 							dvdnav_part_play(dvdnav, playerconfig->resume_title, playerconfig->resume_chapter);
 							next_cell_change = 1;
 						} else {
@@ -1921,11 +1920,11 @@ send_message:
 				/* A NAV packet provides PTS discontinuity information, angle linking information and
 				 * button definitions for DVD menus. We have to handle some stilframes here */
 				pci = dvdnav_get_current_nav_pci(dvdnav);
-				dsi = dvdnav_get_current_nav_dsi(dvdnav);
 
 				if ((ddvd_still_frame & NAV_STILL) && ddvd_iframesend == 0 && ddvd_last_iframe_len)
 					ddvd_iframesend = 1;
 
+				dsi = dvdnav_get_current_nav_dsi(dvdnav);
 				if (dsi->vobu_sri.next_video == 0xbfffffff)
 					ddvd_still_frame |= NAV_STILL;	//|= 1;
 				else
@@ -1952,7 +1951,7 @@ send_message:
 				break;
 
 			default:
-				printf("Unknown event (%i)\n", event);
+				printf("DVDNAV_Unknown event (%i)\n", event);
 				finished = 1;
 				break;
 			}
@@ -1996,7 +1995,7 @@ send_message:
 				safe_write(message_pipe, &evt, sizeof(evt));
 				break;
 			}
-			case 16: // VIDEO_EVENT_PROGRESSIVE_CHANEGD
+			case 16: // VIDEO_EVENT_PROGRESSIVE_CHANGED
 			{
 				struct ddvd_progressive_evt evt;
 				int msg = DDVD_PROGRESSIVE_CHANGED;
@@ -2015,7 +2014,7 @@ send_message:
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
 			int whole_screen = 0;
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
-				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
+				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear physical screen ..
 					/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
 			
 			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer .. 
@@ -2068,7 +2067,6 @@ send_message:
 			}
 
 			pci = dvdnav_get_current_nav_pci(dvdnav);	//update highlight buttons
-			dsi = dvdnav_get_current_nav_dsi(dvdnav);
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				dvdnav_get_current_highlight(dvdnav, &buttonN);
 				if (buttonN == 0)
@@ -2189,9 +2187,6 @@ send_message:
 		}
 		if (ddvd_readpipe(key_pipe, &rccode, sizeof(int), 0) == sizeof(int)) {
 			int keydone = 1;
-
-			if (!dsi)
-				dsi = dvdnav_get_current_nav_dsi(dvdnav);
 
 			if (buttonN == -1)
 				dvdnav_get_current_highlight(dvdnav, &buttonN);
@@ -2401,8 +2396,8 @@ key_play:
 								playerconfig->resume_audio_lock = audio_lock;
 								playerconfig->resume_spu_id = spu_active_id;
 								playerconfig->resume_spu_lock = spu_lock;
-							} else perror("error getting resume position");
-						} perror("error getting resume position");					
+							} else perror("DREAMDVD: error getting resume position");
+						} perror("DREAMDVD: error getting resume position");					
 						finished = 1;
 					}
 					break;						
