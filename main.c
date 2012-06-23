@@ -1917,8 +1917,6 @@ send_message:
 			case DVDNAV_NAV_PACKET:
 				/* A NAV packet provides PTS discontinuity information, angle linking information and
 				 * button definitions for DVD menus. We have to handle some stilframes here */
-				pci = dvdnav_get_current_nav_pci(dvdnav);
-
 				if ((ddvd_still_frame & NAV_STILL) && ddvd_iframesend == 0 && ddvd_last_iframe_len)
 					ddvd_iframesend = 1;
 
