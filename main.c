@@ -2098,13 +2098,95 @@ send_message:
 			playerconfig->in_menu = 0;
 		}
 
+		// spu handling
+		if (ddvd_lbb_changed == 1) {
+			
+			if (ddvd_screeninfo_bypp == 1)
+				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
+			else {
+				int i = 0;
+				for (i = last_spu_return.y_start; i < last_spu_return.y_end; ++i)
+					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + last_spu_return.x_start) * ddvd_screeninfo_bypp, ddvd_lbb + i * 720 + last_spu_return.x_start, last_spu_return.x_end - last_spu_return.x_start);
+			}
+			//struct ddvd_resize_return blit_area;
+			blit_area.x_start = last_spu_return.x_start;
+			blit_area.x_end = last_spu_return.x_end;
+			blit_area.y_start = last_spu_return.y_start;
+			blit_area.y_end = last_spu_return.y_end;
+			if (!ddvd_spu_timer_active)
+			{
+					/* in case this is the last action for this subtitle's bbox (i.e. no timer has been set), then we will clear the bbox.
+					   otherwise, we will leave it there, so it will be contained in the next update as well. */
+				last_spu_return.x_start = last_spu_return.x_end = 0;
+				last_spu_return.y_start = last_spu_return.y_end = 0;
+			}
+
+			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
+			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+
+			uint64_t start=ddvd_get_time();
+			int resized = 0;
+			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
+			{
+//				printf("resizing.. (x=%d y=%d %d %d, %d)\n", x_offset, y_offset, y_source, ddvd_screeninfo_yres, ddvd_screeninfo_xres );
+				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+				resized = 1;
+			}
+			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
+
+			if (resized)
+			{
+				blit_area.x_offset = 0;
+				blit_area.y_offset = 0;
+				blit_area.width = 720;
+				blit_area.height = 576;
+			} else
+			{
+				blit_area.x_offset = x_offset;
+				blit_area.y_offset = y_offset;
+				blit_area.width = ddvd_screeninfo_xres;
+				blit_area.height = ddvd_screeninfo_yres;
+			}
+
+			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
+			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
+			int msg_old = msg;	// save and restore msg it may not be empty
+			msg = DDVD_SCREEN_UPDATE;
+			safe_write(message_pipe, &msg, sizeof(int));
+			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+			
+			msg = msg_old;
+			ddvd_lbb_changed = 0;		
+		}
+
+		// report audio info
+		if (report_audio_info) { 
+			if (playerconfig->audio_format[audio_id] > -1) {
+				uint16_t audio_lang = 0xFFFF;
+				int audio_id_logical;
+				audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
+				audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
+				if (audio_lang == 0xFFFF)
+					audio_lang = 0x2D2D;	
+				int msg_old = msg;	// save and restore msg it may not bee empty
+				msg = DDVD_SHOWOSD_AUDIO;
+				safe_write(message_pipe, &msg, sizeof(int));
+				safe_write(message_pipe, &audio_id, sizeof(int));
+				safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
+				safe_write(message_pipe, &playerconfig->audio_format[audio_id], sizeof(int));
+				msg = msg_old;
+				report_audio_info = 0;
+			}
+		}
+
+		//Userinput
 		if (ddvd_wait_for_user) {
 			struct pollfd pfd[1];	// make new pollfd array
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
 			poll(pfd, 1, -1);
 		}
-		//Userinput
 		if (ddvd_readpipe(key_pipe, &rccode, sizeof(int), 0) == sizeof(int)) {
 			int keydone = 1;
 
@@ -2496,86 +2578,6 @@ key_play:
 				default:
 					break;
 				}
-			}
-		}
-		// spu handling
-		if (ddvd_lbb_changed == 1) {
-			
-			if (ddvd_screeninfo_bypp == 1)
-				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
-			else {
-				int i = 0;
-				for (i = last_spu_return.y_start; i < last_spu_return.y_end; ++i)
-					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + last_spu_return.x_start) * ddvd_screeninfo_bypp, ddvd_lbb + i * 720 + last_spu_return.x_start, last_spu_return.x_end - last_spu_return.x_start);
-			}
-			//struct ddvd_resize_return blit_area;
-			blit_area.x_start = last_spu_return.x_start;
-			blit_area.x_end = last_spu_return.x_end;
-			blit_area.y_start = last_spu_return.y_start;
-			blit_area.y_end = last_spu_return.y_end;
-			if (!ddvd_spu_timer_active)
-			{
-					/* in case this is the last action for this subtitle's bbox (i.e. no timer has been set), then we will clear the bbox.
-					   otherwise, we will leave it there, so it will be contained in the next update as well. */
-				last_spu_return.x_start = last_spu_return.x_end = 0;
-				last_spu_return.y_start = last_spu_return.y_end = 0;
-			}
-
-			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
-			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-
-			uint64_t start=ddvd_get_time();
-			int resized = 0;
-			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
-			{
-//				printf("resizing.. (x=%d y=%d %d %d, %d)\n", x_offset, y_offset, y_source, ddvd_screeninfo_yres, ddvd_screeninfo_xres );
-				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
-				resized = 1;
-			}
-			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-
-			if (resized)
-			{
-				blit_area.x_offset = 0;
-				blit_area.y_offset = 0;
-				blit_area.width = 720;
-				blit_area.height = 576;
-			} else
-			{
-				blit_area.x_offset = x_offset;
-				blit_area.y_offset = y_offset;
-				blit_area.width = ddvd_screeninfo_xres;
-				blit_area.height = ddvd_screeninfo_yres;
-			}
-
-			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
-			int msg_old = msg;	// save and restore msg it may not be empty
-			msg = DDVD_SCREEN_UPDATE;
-			safe_write(message_pipe, &msg, sizeof(int));
-			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-			
-			msg = msg_old;
-			ddvd_lbb_changed = 0;		
-		}
-		// report audio info
-		if (report_audio_info) { 
-			if (playerconfig->audio_format[audio_id] > -1) {
-				uint16_t audio_lang = 0xFFFF;
-				int audio_id_logical;
-				audio_id_logical = dvdnav_get_audio_logical_stream(dvdnav, audio_id);
-				audio_lang = dvdnav_audio_stream_to_lang(dvdnav, audio_id_logical);
-				if (audio_lang == 0xFFFF)
-					audio_lang = 0x2D2D;	
-				int msg_old = msg;	// save and restore msg it may not bee empty
-				msg = DDVD_SHOWOSD_AUDIO;
-				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &audio_id, sizeof(int));
-				safe_write(message_pipe, &audio_lang, sizeof(uint16_t));
-				safe_write(message_pipe, &playerconfig->audio_format[audio_id], sizeof(int));
-				msg = msg_old;
-				report_audio_info = 0;
 			}
 		}
 	}
