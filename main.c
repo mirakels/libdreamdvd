@@ -2235,9 +2235,9 @@ send_message:
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
 					
-					ddvd_clear_buttons = 1;
 					dvdnav_button_activate(dvdnav, pci);
 					ddvd_play_empty(TRUE);
+					ddvd_clear_buttons = 1;
 					if (ddvd_wait_timer_active)
 						ddvd_wait_timer_active = 0;
 					break;
