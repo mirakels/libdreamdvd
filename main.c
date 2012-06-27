@@ -957,7 +957,6 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	while (!finished) {
 		pci_t *pci = 0;
 		dsi_t *dsi = 0;
-		int buttonN = -1;
 		int in_menu;
 
 		/* the main reading function */
@@ -1923,6 +1922,7 @@ send_message:
 			}
 
 			if (pci->hli.hl_gi.btn_ns > 0) {
+				int buttonN;
 				dvdnav_get_current_highlight(dvdnav, &buttonN);
 				if (buttonN == 0)
 					buttonN = 1;
@@ -2183,9 +2183,6 @@ send_message:
 		}
 		if (ddvd_readpipe(key_pipe, &rccode, sizeof(int), 0) == sizeof(int)) {
 			int keydone = 1;
-
-			if (buttonN == -1)
-				dvdnav_get_current_highlight(dvdnav, &buttonN);
 
 			switch (rccode)	// actions inside and outside of menu
 			{
