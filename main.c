@@ -1934,17 +1934,6 @@ send_message:
 			}
 		}
 
-
-		if ((dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav) || in_menu) && !playerconfig->in_menu) {
-			int bla = DDVD_MENU_OPENED;
-			safe_write(message_pipe, &bla, sizeof(int));
-			playerconfig->in_menu = 1;
-		} else if (!(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav)) && playerconfig->in_menu) {
-			int bla = DDVD_MENU_CLOSED;
-			safe_write(message_pipe, &bla, sizeof(int));
-			playerconfig->in_menu = 0;
-		}
-
 		// spu handling
 		if (ddvd_lbb_changed == 1) {
 			
@@ -2152,6 +2141,17 @@ send_message:
 				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
 				memcpy(&last_blit_area,&blit_area,sizeof(struct ddvd_resize_return)); // safe blit area for next wipe
 			}
+		}
+
+		// final menu status check
+		if (!playerconfig->in_menu && in_menu && (dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav))) {
+			int bla = DDVD_MENU_OPENED;
+			safe_write(message_pipe, &bla, sizeof(int));
+			playerconfig->in_menu = 1;
+		} else if (playerconfig->in_menu && !(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav))) {
+			int bla = DDVD_MENU_CLOSED;
+			safe_write(message_pipe, &bla, sizeof(int));
+			playerconfig->in_menu = 0;
 		}
 
 		// report audio info
