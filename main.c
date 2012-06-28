@@ -1646,13 +1646,15 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Prepare to display some Buttons */
-				if (ddvd_clear_buttons == 0) {
-					memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
-					have_highlight = 1;
-				} else {
-					ddvd_clear_buttons = 0;
-					//printf("clear buttons\n");
+				{
+					dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
+					if (!ddvd_clear_buttons && highlight_event.buttonN != hl->buttonN ||
+						highlight_event.pts != hl->pts) {
+						memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
+						have_highlight = 1;
+					}
 				}
+				ddvd_clear_buttons = 0;
 				break;
 
 			case DVDNAV_VTS_CHANGE:
