@@ -1869,7 +1869,6 @@ send_message:
 			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
 			
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
-			int whole_screen = 0;
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
 				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear physical screen ..
 					/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
