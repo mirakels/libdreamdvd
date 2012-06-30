@@ -958,6 +958,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		pci_t *pci = 0;
 		dsi_t *dsi = 0;
 		int in_menu;
+		int draw_osd = 0;
 
 		/* the main reading function */
 		if (ddvd_playmode == PLAY) {	//skip when not in play mode
@@ -1937,7 +1938,6 @@ send_message:
 
 		// spu handling
 		if (ddvd_lbb_changed == 1) {
-			
 			if (ddvd_screeninfo_bypp == 1)
 				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
 			else {
@@ -1958,43 +1958,8 @@ send_message:
 				last_spu_return.y_start = last_spu_return.y_end = 0;
 			}
 
-			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
-			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-
-			uint64_t start=ddvd_get_time();
-			int resized = 0;
-			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
-			{
-//				printf("resizing.. (x=%d y=%d %d %d, %d)\n", x_offset, y_offset, y_source, ddvd_screeninfo_yres, ddvd_screeninfo_xres );
-				blit_area = ddvd_resize_pixmap_spu(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
-				resized = 1;
-			}
-			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-
-			if (resized)
-			{
-				blit_area.x_offset = 0;
-				blit_area.y_offset = 0;
-				blit_area.width = 720;
-				blit_area.height = 576;
-			} else
-			{
-				blit_area.x_offset = x_offset;
-				blit_area.y_offset = y_offset;
-				blit_area.width = ddvd_screeninfo_xres;
-				blit_area.height = ddvd_screeninfo_yres;
-			}
-
-			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-			//printf("destination area to blit: %d %d %d %d Time: %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end,last_spu_return.display_time);
-			int msg_old = msg;	// save and restore msg it may not be empty
-			msg = DDVD_SCREEN_UPDATE;
-			safe_write(message_pipe, &msg, sizeof(int));
-			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-			
-			msg = msg_old;
-			ddvd_lbb_changed = 0;		
+			ddvd_lbb_changed = 0;
+			draw_osd = 1;
 		}
 
 		// highlight/button handling
@@ -2104,44 +2069,55 @@ send_message:
 				blit_area.y_end = hl.ey;
 				libdvdnav_workaround = 1;
 			}
-			if (!libdvdnav_workaround)
+			if (!libdvdnav_workaround) {
 				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer ..
+				draw_osd = 0;
+			}
 			else
+				draw_osd = 1;
+		}
+
+		if (draw_osd) {
+			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
+			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+
+			uint64_t start = ddvd_get_time();
+			int resized = 0;
+
+			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
 			{
-				int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
-				int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-				int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
+//				printf("resizing\n");
+				resized = 1;
+				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+			}
 
-				uint64_t start=ddvd_get_time();
-				int resized = 0;
+			blit_area.width = ddvd_screeninfo_xres;
+			blit_area.height = ddvd_screeninfo_yres;
 
-				if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
-				{
-//					printf("resizing\n");
-					resized = 1;
-					blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
-				}
-
+			if (resized)
+			{
+				blit_area.x_offset = 0;
+				blit_area.y_offset = 0;
+				blit_area.width = 720;
+				blit_area.height = 576;
+			} else
+			{
+				blit_area.x_offset = x_offset;
+				blit_area.y_offset = y_offset;
 				blit_area.width = ddvd_screeninfo_xres;
 				blit_area.height = ddvd_screeninfo_yres;
-
-				if (resized)
-				{
-					blit_area.x_offset = 0;
-					blit_area.y_offset = 0;
-				} else
-				{
-					blit_area.x_offset = x_offset;
-					blit_area.y_offset = y_offset;
-				}
-				memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
-				//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-				//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
-				msg = DDVD_SCREEN_UPDATE;
-				safe_write(message_pipe, &msg, sizeof(int));
-				safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-				memcpy(&last_blit_area,&blit_area,sizeof(struct ddvd_resize_return)); // safe blit area for next wipe
 			}
+			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
+			//printf("needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
+			//printf("destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+			int msg_old = msg;	// save and restore msg it may not be empty
+			msg = DDVD_SCREEN_UPDATE;
+			safe_write(message_pipe, &msg, sizeof(int));
+			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
+			memcpy(&last_blit_area, &blit_area, sizeof(struct ddvd_resize_return)); // safe blit area for next wipe
+			msg = msg_old;
+			draw_osd = 0;
 		}
 
 		// final menu status check
