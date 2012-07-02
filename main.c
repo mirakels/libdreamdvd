@@ -624,15 +624,9 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	// decide which resize routine we should use
 	// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
 	// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
+	// for bypp != 0 resize function is set in spu/highlight code
 	if (ddvd_screeninfo_bypp == 1)
-		ddvd_resize_pixmap = ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_1bpp;
-	else if (ddvd_screeninfo_xres > 720)
-		ddvd_resize_pixmap = ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_xbpp;
-	else
-	{
-		ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp;
-		ddvd_resize_pixmap_spu = &ddvd_resize_pixmap_xbpp_smooth;
-	}
+		ddvd_resize_pixmap = &ddvd_resize_pixmap_1bpp;
 
 	uint8_t *last_iframe = NULL;
 	uint8_t *spu_buffer = NULL;
@@ -1891,6 +1885,10 @@ send_message:
 			msg = DDVD_COLORTABLE_UPDATE;
 			if (ddvd_screeninfo_bypp == 1)
 				safe_write(message_pipe, &msg, sizeof(int));
+			else
+				ddvd_resize_pixmap = (ddvd_screeninfo_xres > 720) ? // set resize function
+							&ddvd_resize_pixmap_xbpp :
+							&ddvd_resize_pixmap_xbpp_smooth;
 			for (ctmp = 0; ctmp < 4; ctmp++) {
 				colneu.blue = ddvd_bl[ctmp + 252];
 				colneu.green = ddvd_gn[ctmp + 252];
@@ -2000,6 +1998,8 @@ send_message:
 					msg = DDVD_COLORTABLE_UPDATE;
 					if (ddvd_screeninfo_bypp == 1)
 						safe_write(message_pipe, &msg, sizeof(int));
+					else
+						ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp; // set resize function
 					for (i = 0; i < 4; i++) {
 						tmp = ((pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0]) >> (16 + 4 * i)) & 0xf;
 						tmp2 = ((pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0]) >> (4 * i)) & 0xf;
@@ -2041,6 +2041,8 @@ send_message:
 				msg = DDVD_COLORTABLE_UPDATE;
 				if (ddvd_screeninfo_bypp == 1)
 					safe_write(message_pipe, &msg, sizeof(int));
+				else
+					ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp; // set resize function
 				for (i = 0; i < 4; i++) {
 					tmp = ((hl.palette) >> (16 + 4 * i)) & 0xf;
 					tmp2 = ((hl.palette) >> (4 * i)) & 0xf;
@@ -2088,13 +2090,13 @@ send_message:
 
 			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres || ddvd_screeninfo_xres != 720) && !playerconfig->canscale)
 			{
+				// decide which resize routine we should use
+				// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
+				// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
 //				printf("resizing\n");
 				resized = 1;
 				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres, x_offset, y_offset, blit_area.x_start, blit_area.x_end, blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
 			}
-
-			blit_area.width = ddvd_screeninfo_xres;
-			blit_area.height = ddvd_screeninfo_yres;
 
 			if (resized)
 			{
