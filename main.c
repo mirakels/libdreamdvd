@@ -1489,7 +1489,8 @@ send_message:
 							//printf("SPTS? %X\n",(int)spts);
 						}
 
-						if (ddvd_spu_ptr >= (spu_buffer[0] << 8 | spu_buffer[1]))	// SPU packet complete ?
+						int spulen = spu_buffer[0] << 8 | spu_buffer[1];
+						if (ddvd_spu_ptr >= spulen)	// SPU packet complete ?
 						{
 							if (ddvd_spu_backnr == NUM_SPU_BACKBUFFER)	// backbuffer already full ?
 							{
@@ -1503,9 +1504,9 @@ send_message:
 								ddvd_spu_backptr -= tmplen;
 							}
 
-							memcpy(spu_backbuffer + ddvd_spu_backptr, spu_buffer, (spu_buffer[0] << 8 | spu_buffer[1]));	// copy into backbuffer
+							memcpy(spu_backbuffer + ddvd_spu_backptr, spu_buffer, spulen);	// copy into backbuffer
 							spu_backpts[ddvd_spu_backnr++] = spts;	// store pts
-							ddvd_spu_backptr += (spu_buffer[0] << 8 | spu_buffer[1]);	// increase ptr
+							ddvd_spu_backptr += spulen;	// increase ptr
 
 							ddvd_spu_ptr = 0;
 						}
