@@ -1551,18 +1551,19 @@ send_message:
 						*(int *)(pal + i * 4) = htonl(*(int *)(buf + i * 4));
 					i = 0;
 #endif
-					while (i < 16 * 4) {
-						int y = buf[i + 1];
-						signed char cr = buf[i + 2];	//v
-						signed char cb = buf[i + 3];	//u
-						//printf("%d %d %d ->", y, cr, cb);
-						y = pal[i + 1];
-						cr = pal[i + 2];	//v
-						cb = pal[i + 3];	//u
-						//printf(" %d %d %d\n", y, cr, cb);
-						i += 4;
-					}
-					i = 0;
+					// dump buf and pal tables for debug reasons
+					//while (i < 16 * 4) {
+					//	int y = buf[i + 1];
+					//	signed char cr = buf[i + 2];	//v
+					//	signed char cb = buf[i + 3];	//u
+					//	printf("%d %d %d ->", y, cr, cb);
+					//	y = pal[i + 1];
+					//	cr = pal[i + 2];	//v
+					//	cb = pal[i + 3];	//u
+					//	printf(" %d %d %d\n", y, cr, cb);
+					//	i += 4;
+					//}
+					//i = 0;
 
 					while (i < 16 * 4) {
 						int y = pal[i + 1];
