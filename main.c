@@ -1992,49 +1992,19 @@ send_message:
 					btni = &pci->hli.btnit[2 * btns_per_group + highlight_event.buttonN - 1];
 
 				if (btni && btni->btn_coln != 0) {
-					// get and set clut for actual button
-					unsigned char tmp, tmp2;
-					struct ddvd_color colneu;
-					int i;
-					msg = DDVD_COLORTABLE_UPDATE;
-					if (ddvd_screeninfo_bypp == 1)
-						safe_write(message_pipe, &msg, sizeof(int));
-					else
-						ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp; // set resize function
-					for (i = 0; i < 4; i++) {
-						tmp = ((pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0]) >> (16 + 4 * i)) & 0xf;
-						tmp2 = ((pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0]) >> (4 * i)) & 0xf;
-						colneu.blue = ddvd_bl[i + 252] = ddvd_bl[tmp];
-						colneu.green = ddvd_gn[i + 252] = ddvd_gn[tmp];
-						colneu.red = ddvd_rd[i + 252] = ddvd_rd[tmp];
-						colneu.trans = ddvd_tr[i + 252] = (0xF - tmp2) * 0x1111;
-						if (ddvd_screeninfo_bypp == 1)
-							safe_write(message_pipe, &colneu, sizeof(struct ddvd_color));
-					}
-					msg = DDVD_NULL;
-					//CHANGE COLORMAP
-
-					memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer ..
-					//copy button into screen
-					for (i = btni->y_start; i < btni->y_end; i++) {
-						if (ddvd_screeninfo_bypp == 1)
-							memcpy(ddvd_lbb2 + btni->x_start + 720 * (i),
-							       ddvd_lbb + btni->x_start + 720 * (i),
-							       btni->x_end - btni->x_start);
-						else
-							ddvd_blit_to_argb(ddvd_lbb2 + btni->x_start * ddvd_screeninfo_bypp +
-									  720 * ddvd_screeninfo_bypp * i,
-									  ddvd_lbb + btni->x_start + 720 * (i),
-									  btni->x_end - btni->x_start);
-					}
-					blit_area.x_start = btni->x_start;
-					blit_area.x_end = btni->x_end;
-					blit_area.y_start = btni->y_start;
-					blit_area.y_end = btni->y_end;
+					hl.palette = pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0];
+					hl.sy = btni->y_start;
+					hl.ey = btni->y_end;
+					hl.sx = btni->x_start;
+					hl.ex = btni->x_end;
 					libdvdnav_workaround = 1;
 				}
 			}
 			if (!libdvdnav_workaround && dvdnav_get_highlight_area(pci, highlight_event.buttonN, 0, &hl) == DVDNAV_STATUS_OK) {
+				libdvdnav_workaround = 1;
+			}
+
+			if (libdvdnav_workaround) {
 				// get and set clut for actual button
 				unsigned char tmp, tmp2;
 				struct ddvd_color colneu;
@@ -2072,13 +2042,12 @@ send_message:
 				blit_area.y_start = hl.sy;
 				blit_area.y_end = hl.ey;
 				libdvdnav_workaround = 1;
+				draw_osd = 1;
 			}
-			if (!libdvdnav_workaround) {
+			else {
 				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer ..
 				draw_osd = 0;
 			}
-			else
-				draw_osd = 1;
 		}
 
 		if (draw_osd) {
