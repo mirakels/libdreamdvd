@@ -917,6 +917,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	ddvd_playmode = PLAY;
 
 	ddvd_lbb_changed = 0;
+	ddvd_clear_screen = 0;
 
 	unsigned long long spu_backpts[NUM_SPU_BACKBUFFER];
 	int have_highlight = 0;
@@ -1097,8 +1098,7 @@ send_message:
 					ddvd_spu_timer_active = 0;
 						/* the last_spu bbox is still filled with the correct value, no need to blit full screen */
 						/* TODO: only clear part of backbuffer */
-					memset(ddvd_lbb, 0, 720 * 576);	//clear SPU backbuffer
-					ddvd_lbb_changed = 1;
+					ddvd_clear_screen = 1;
 				}
 			}
 
@@ -1867,9 +1867,9 @@ send_message:
 			
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
-				memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear physical screen ..
-					/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
-			
+				ddvd_clear_screen = 1;
+
+			/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
 			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer ..
 //			printf("[SPU] previous bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
@@ -1941,6 +1941,7 @@ send_message:
 			if (ddvd_screeninfo_bypp == 1)
 				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
 			else {
+				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);    //clear backbuffer ..
 				int i = 0;
 				for (i = last_spu_return.y_start; i < last_spu_return.y_end; ++i)
 					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + last_spu_return.x_start) * ddvd_screeninfo_bypp, ddvd_lbb + i * 720 + last_spu_return.x_start, last_spu_return.x_end - last_spu_return.x_start);
@@ -1967,12 +1968,7 @@ send_message:
 			have_highlight = 0;
 			dvdnav_highlight_area_t hl;
 
-			memcpy(&blit_area,&last_blit_area,sizeof(struct ddvd_resize_return));
-			memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear physical screen ..
-			msg = DDVD_SCREEN_UPDATE;	// wipe old highlight
-			safe_write(message_pipe, &msg, sizeof(int));
-			safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-			//printf("destination area to wipe: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
+			ddvd_clear_screen = 1;
 
 			//struct ddvd_resize_return blit_area;
 			blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
@@ -2050,6 +2046,14 @@ send_message:
 			}
 		}
 
+		if (ddvd_clear_screen) {
+			//printf("previous area to wipe: %d %d %d %d\n", last_blit_area.x_start, last_blit_area.x_end, last_blit_area.y_start, last_blit_area.y_end);
+			memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);        //clear screen ..
+			msg = DDVD_SCREEN_UPDATE;
+			safe_write(message_pipe, &msg, sizeof(int));
+			safe_write(message_pipe, &last_blit_area, sizeof(struct ddvd_resize_return));
+			ddvd_clear_screen = 0;
+		}
 		if (draw_osd) {
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
@@ -2164,25 +2168,11 @@ send_message:
 					break;
 				case DDVD_KEY_OK:	//OK
 					ddvd_wait_for_user = 0;
-					memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
-					memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
-					memset(ddvd_lbb2, 0, 720 * 576 * ddvd_screeninfo_bypp); //clear 2nd backbuffer
-					blit_area.x_start = blit_area.y_start = 0;
-					blit_area.x_end = ddvd_screeninfo_xres - 1;
-					blit_area.y_end = ddvd_screeninfo_yres - 1;
-					blit_area.x_offset = 0;
-					blit_area.y_offset = 0;
-					blit_area.width = ddvd_screeninfo_xres;
-					blit_area.height = ddvd_screeninfo_yres;
-					msg = DDVD_SCREEN_UPDATE;
-					safe_write(message_pipe, &msg, sizeof(int));
-					safe_write(message_pipe, &blit_area, sizeof(struct ddvd_resize_return));
-					
-					dvdnav_button_activate(dvdnav, pci);
 					ddvd_play_empty(TRUE);
 					ddvd_clear_buttons = 1;
 					if (ddvd_wait_timer_active)
 						ddvd_wait_timer_active = 0;
+					dvdnav_button_activate(dvdnav, pci);
 					break;
 				case DDVD_KEY_MENU:	//Dream
 					if (dvdnav_menu_call(dvdnav, DVD_MENU_Root) == DVDNAV_STATUS_OK)
@@ -2705,8 +2695,7 @@ static void ddvd_play_empty(int device_clear)
 	ddvd_spu_timer_active = 0;
 	ddvd_spu_timer_end = 0;
 
-	memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer
-	ddvd_lbb_changed = 1;
+	ddvd_clear_screen = 1;
 	
 	if (device_clear)
 		ddvd_device_clear();

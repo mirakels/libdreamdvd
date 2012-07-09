@@ -150,6 +150,7 @@ int ddvd_last_iframe_len;
 int ddvd_spu_ptr,ddvd_display_time;
 int ddvd_spu_backptr,ddvd_spu_backnr;
 int ddvd_lbb_changed;
+int ddvd_clear_screen;
 
 enum {TOFF, SLOWFW, FASTFW, SLOWBW, FASTBW};
 int ddvd_trickmode,ddvd_trickspeed;
