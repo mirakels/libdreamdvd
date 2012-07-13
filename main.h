@@ -1,4 +1,6 @@
 /* 
+ * vim: ts=4
+ *
  * DreamDVD V0.9 - DVD-Player for Dreambox
  * Copyright (C) 2007 by Seddi
  * 
@@ -21,6 +23,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA
  *
  * part of libdreamdvd
+ *
+ *
  */
 
 #ifndef __MAIN_H__
@@ -206,7 +210,7 @@ struct ddvd {
 	int canscale;
 	int key_pipe[2];				// pipe for sending a command/remote control key (sizeof(int)) to the player
 	int message_pipe[2];			// pipe for getting player status, osd time and text as well as 8bit color tables
-	char *dvd_path;				// the path of a dvd block device ("/dev/dvd"), an iso-file ("/hdd/dvd.iso")
+	char *dvd_path;					// the path of a dvd block device ("/dev/dvd"), an iso-file ("/hdd/dvd.iso")
 									// or a dvd file structure ("/hdd/dvd/mymovie") to play 
 	/* buffer for actual states */
 	char title_string[96];
@@ -242,21 +246,20 @@ struct ddvd {
 };
 
 /* internal functions */
-static struct 		ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig);
+static struct 	ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig);
 static int 		ddvd_readpipe(int pipefd, void *dest, size_t bytes, int blocked_read);
 static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect, int tv_mode);
-static uint64_t 	ddvd_get_time(void);
-static void 		ddvd_play_empty(int device_clear);
-static void 		ddvd_device_clear(void);
-static struct 		ddvd_spu_return	ddvd_spu_decode_data(const uint8_t * buffer, int len);
-static void 		ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
+static uint64_t	ddvd_get_time(void);
+static void 	ddvd_play_empty(int device_clear);
+static void 	ddvd_device_clear(void);
+static struct 	ddvd_spu_return	ddvd_spu_decode_data(const uint8_t * buffer, int len);
+static void 	ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 #if CONFIG_API_VERSION == 3
-static void 		ddvd_set_pcr_offset(void);
-static void 		ddvd_unset_pcr_offset(void);
+static void 	ddvd_set_pcr_offset(void);
+static void 	ddvd_unset_pcr_offset(void);
 #endif
-struct 				ddvd_resize_return ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-struct 				ddvd_resize_return ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-struct				ddvd_resize_return ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-struct				ddvd_resize_return (*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
-
+struct 	ddvd_resize_return	ddvd_resize_pixmap_xbpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct 	ddvd_resize_return	ddvd_resize_pixmap_xbpp_smooth(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct	ddvd_resize_return	ddvd_resize_pixmap_1bpp(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
+struct	ddvd_resize_return	(*ddvd_resize_pixmap)(unsigned char *pixmap, int xsource, int ysource, int xdest, int ydest, int xoffset, int yoffset, int xstart, int xend, int ystart, int yend, int colors);
 #endif
