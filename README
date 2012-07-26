@@ -1,0 +1,36 @@
+This is a clone of the Dream Multimedia lib dreamdvd librarry
+The library forms an interface/api between libdvdread and the enigma2
+dvd handling code.
+
+This clone is made as I made a lot of changes and have no write
+access to the original repository. And because the server for the
+original repo does not always seem to be online I decided to make
+clone on github.
+
+The changes mainly optimize menu handling and subtitle display.
+The issue is that menu buttons are often displayed way to often
+and somtimes do not appear or seem to dispaly repeatedline giving a
+stroboscope effect. Sometimes subtitles are displayed to early. The
+reaseon for most of this is that audio/video handling is handled by
+hardware that uses /caching/buffers capuing delays. Menus and subtitles
+are on OSD which is taken care of by the libdreamdvd libray itself.
+
+Also the 'resume' function does not work.
+
+Finally many cosmet changes, small bug fixes and refactored code
+to remove duplicat code.
+
+The current status is
+- resume function works again
+- menu buttons have less stroboscope effect and now always
+  show correctly (99%)  but still are shown to soon sometimes.
+- subtitle still may be displayed to soon.
+
+I have  code that fixes mostly syunchronize buttons/subtiles with the
+video output but it still fails sometimes  or result in problems displaying
+the wrong vidoe data when navigating through menus.
+
+-Mirakels
+mirakels@users.sourceforge.net
+
+
