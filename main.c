@@ -2140,6 +2140,11 @@ send_message:
 				case DDVD_UNSET_MUTE:
 					ismute = 0;
 					break;
+				case DDVD_KEY_MENU:     //Dream
+				case DDVD_KEY_AUDIOMENU:        //Audio
+					if (dvdnav_menu_call(dvdnav, rccode == DDVD_KEY_MENU ? DVD_MENU_Root : DVD_MENU_Audio) == DVDNAV_STATUS_OK)
+						ddvd_play_empty(TRUE);
+					break;
 				default:
 					keydone = 0;
 					break;
@@ -2166,14 +2171,6 @@ send_message:
 						if (ddvd_wait_timer_active)
 							ddvd_wait_timer_active = 0;
 						dvdnav_button_activate(dvdnav, pci);
-						break;
-					case DDVD_KEY_MENU:	//Dream
-						if (dvdnav_menu_call(dvdnav, DVD_MENU_Root) == DVDNAV_STATUS_OK)
-							ddvd_play_empty(TRUE);
-						break;
-					case DDVD_KEY_AUDIOMENU:	//Audio
-						if (dvdnav_menu_call(dvdnav, DVD_MENU_Audio) == DVDNAV_STATUS_OK)
-							ddvd_play_empty(TRUE);
 						break;
 					case DDVD_KEY_EXIT:	//Exit
 						printf("DDVD_KEY_EXIT (menu)\n");
@@ -2298,14 +2295,6 @@ key_play:
 						}
 						break;
 					}
-					case DDVD_KEY_MENU:	//Dream
-						if (dvdnav_menu_call(dvdnav, DVD_MENU_Root) == DVDNAV_STATUS_OK)
-							ddvd_play_empty(TRUE);
-						break;
-					case DDVD_KEY_AUDIOMENU:	//Audio
-						if (dvdnav_menu_call(dvdnav, DVD_MENU_Audio) == DVDNAV_STATUS_OK)
-							ddvd_play_empty(TRUE);
-						break;
 					case DDVD_KEY_EXIT:	//Exit
 					{
 						printf("LIBDVD: DDVD_KEY_EXIT (menu)\n");
