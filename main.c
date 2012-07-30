@@ -1866,7 +1866,7 @@ send_message:
 //			printf("[SPU] previous bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
-			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(spu_backbuffer, tmplen));	// decode
+			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, spu_backbuffer, tmplen, spts));	// decode
 //			printf("[SPU] merged   bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
@@ -2697,7 +2697,7 @@ static void ddvd_device_clear(void)
 }
 
 // SPU Decoder
-static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int len)
+static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t * buffer, int len, unsigned long long pts)
 {
 	int x1spu, x2spu, y1spu, y2spu, xspu, yspu;
 	int offset[2], param_len;
@@ -2828,7 +2828,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 		if (len == 0)
 			len = (x2spu - xspu) + 1;
 
-		memset(ddvd_lbb + xspu + 720 * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
+		memset(spu_buf + xspu + 720 * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
 		xspu += len;
 		if (xspu > x2spu) {
 			if (!aligned) {
@@ -2847,6 +2847,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(const uint8_t * buffer, int l
 	return_code.y_start = y1spu;
 	return_code.y_end = y2spu;
 	return_code.force_hide = force_hide;
+	return_code.pts = pts;
 
 	return return_code;
 }

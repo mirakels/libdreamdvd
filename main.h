@@ -128,6 +128,7 @@ struct ddvd_spu_return {
 	int y_start;
 	int y_end;
 	int force_hide;
+	unsigned long long pts;
 };
 
 struct ddvd_resize_return {
@@ -252,7 +253,7 @@ static int 		ddvd_check_aspect(int dvd_aspect, int dvd_scale_perm, int tv_aspect
 static uint64_t	ddvd_get_time(void);
 static void 	ddvd_play_empty(int device_clear);
 static void 	ddvd_device_clear(void);
-static struct 	ddvd_spu_return	ddvd_spu_decode_data(const uint8_t * buffer, int len);
+static struct 	ddvd_spu_return	ddvd_spu_decode_data(char *spu_buf, const uint8_t * buffer, int len, unsigned long long pts);
 static void 	ddvd_blit_to_argb(void *_dst, const void *_src, int pix);
 #if CONFIG_API_VERSION == 3
 static void 	ddvd_set_pcr_offset(void);
