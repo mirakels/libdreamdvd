@@ -2173,7 +2173,7 @@ send_message:
 						dvdnav_button_activate(dvdnav, pci);
 						break;
 					case DDVD_KEY_EXIT:	//Exit
-						printf("DDVD_KEY_EXIT (menu)\n");
+						printf("LIBDVD_KEY_EXIT (menu)\n");
 						playerconfig->resume_title = 0;
 						playerconfig->resume_chapter = 0;
 						playerconfig->resume_block = 0;
@@ -2297,11 +2297,12 @@ key_play:
 					}
 					case DDVD_KEY_EXIT:	//Exit
 					{
-						printf("LIBDVD: DDVD_KEY_EXIT (menu)\n");
+						printf("LIBDVD: DDVD_KEY_EXIT (save resume info)\n");
 						int resume_title, resume_chapter; //safe resume info
 						uint32_t resume_block, total_block;
-						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) && (0 != resume_title)) {
-							if(dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
+						if (dvdnav_current_title_info(dvdnav, &resume_title, &resume_chapter) &&
+							resume_title != 0 &&
+							dvdnav_get_position (dvdnav, &resume_block, &total_block) == DVDNAV_STATUS_OK) {
 								playerconfig->resume_title = resume_title;
 								playerconfig->resume_chapter = resume_chapter;
 								playerconfig->resume_block = resume_block;
@@ -2309,9 +2310,6 @@ key_play:
 								playerconfig->resume_audio_lock = audio_lock;
 								playerconfig->resume_spu_id = spu_active_id;
 								playerconfig->resume_spu_lock = spu_lock;
-							}
-							else
-								perror("LIBDVD: error getting resume position");
 						}
 						else
 							perror("LIBDVD: error getting resume position");
