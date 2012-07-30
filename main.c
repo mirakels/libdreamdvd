@@ -2383,7 +2383,7 @@ key_play:
 							spu_id_logical++;
 							spu_active_id = dvdnav_get_spu_logical_stream(dvdnav, spu_id_logical);
 						}
-						else if (rccode == DDVD_SET_SUBTITLE) {
+						else {
 							ddvd_readpipe(key_pipe, &spu_id_logical, sizeof(int), 1);
 							printf("LIBDVD: DDVD_SET_SUBTITLE %i (prev %i)\n", spu_id_logical, spu_active_id);
 							if (spu_id_logical < MAX_SPU && playerconfig->spu_map[spu_id_logical] > -1)
