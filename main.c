@@ -2341,24 +2341,23 @@ key_play:
 						break;
 					}
 					case DDVD_KEY_AUDIO:	//jump to next audio track
-					{
-						int count = 0;
-						audio_id = (audio_id == MAX_AUDIO-1 ? 0 : audio_id+1);
-						while (playerconfig->audio_format[audio_id] == -1 && count++ < MAX_AUDIO-1)
-							audio_id = (audio_id == 7 ? 0 : audio_id+1);
-						report_audio_info = 1;
-						ddvd_play_empty(TRUE);
-						audio_lock = 1;
-						ddvd_lpcm_count = 0;
-						break;
-					}
 					case DDVD_SET_AUDIO:	//change to given audio track
 					{
-						int set_audio_id;
-						ddvd_readpipe(key_pipe, &set_audio_id, sizeof(int), 1);
-						printf("LIBDVD: DDVD_SET_AUDIO %i (prev %i)\n", set_audio_id, audio_id);
-						if (set_audio_id < MAX_AUDIO && playerconfig->audio_format[audio_id] != -1)
-							audio_id = set_audio_id;
+						int count = 1;
+						printf("LIBDVD: DDVD_SET_AUDIO CURRENT %i\n", audio_id);
+						if (rccode == DDVD_SET_AUDIO) {
+							ddvd_readpipe(key_pipe, &count, sizeof(int), 1);
+							if (count < MAX_AUDIO && playerconfig->audio_format[count] != -1)
+								audio_id = count;
+						}
+						else {
+							do {
+								audio_id++;
+								if (audio_id >= MAX_AUDIO)
+									audio_id = 0;
+							} while (playerconfig->audio_format[audio_id] == -1 && count++ < MAX_AUDIO);
+						}
+						printf("LIBDVD: DDVD_SET_AUDIO %i\n", audio_id);
 						report_audio_info = 1;
 						ddvd_play_empty(TRUE);
 						audio_lock = 1;
