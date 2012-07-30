@@ -2220,33 +2220,26 @@ send_message:
 						msg = DDVD_SHOWOSD_TIME;
 						break;
 					}
+					case DDVD_SET_TITLE:
 					case DDVD_KEY_PREV_TITLE:
 					case DDVD_KEY_DOWN:
-					{
-						int titleNo, titleNumber, chapterNo;
-						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-						dvdnav_get_number_of_titles(dvdnav, &titleNumber);
-						titleNo--;
-						if (titleNo > titleNumber)
-							titleNo = 1;
-						if (titleNo <= 0)
-							titleNo = titleNumber;
-						dvdnav_part_play(dvdnav, titleNo, 1);
-						ddvd_play_empty(TRUE);
-						msg = DDVD_SHOWOSD_TIME;
-						break;
-					}
 					case DDVD_KEY_NEXT_TITLE:
 					case DDVD_KEY_UP:
 					{
-						int titleNo, titleNumber, chapterNo;
+						int titleNo, totalTitles, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-						dvdnav_get_number_of_titles(dvdnav, &titleNumber);
-						titleNo++;
-						if (titleNo > titleNumber)
+						dvdnav_get_number_of_titles(dvdnav, &totalTitles);
+						if (rccode == DDVD_SET_TITLE)
+							ddvd_readpipe(key_pipe, &titleNo, sizeof(int), 1);
+						else if (rccode == DDVD_KEY_PREV_TITLE || rccode == DDVD_KEY_DOWN)
+							titleNo--;
+						else
+							titleNo++;
+						if (titleNo > totalTitles)
 							titleNo = 1;
 						if (titleNo <= 0)
-							titleNo = titleNumber;
+							titleNo = totalTitles;
+						printf("LIBDVD: DDVD_SET_TITLE %d/%d\n", titleNo, totalTitles);
 						dvdnav_part_play(dvdnav, titleNo, 1);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
@@ -2438,19 +2431,6 @@ key_play:
 							}
 							dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
 							ddvd_lpcm_count = 0;
-							msg = DDVD_SHOWOSD_TIME;
-						}
-						break;
-					}
-					case DDVD_SET_TITLE:
-					{
-						int title, totalTitles;
-						ddvd_readpipe(key_pipe, &title, sizeof(int), 1);
-						dvdnav_get_number_of_titles(dvdnav, &totalTitles);
-						printf("LIBDVD: DDVD_SET_TITLE %d/%d\n", title, totalTitles);
-						if (title <= totalTitles) {
-							dvdnav_part_play(dvdnav, title, 0);
-							ddvd_play_empty(TRUE);
 							msg = DDVD_SHOWOSD_TIME;
 						}
 						break;
