@@ -2195,33 +2195,26 @@ send_message:
 			}
 			else if (!keydone) {	//Actions inside a Movie
 				switch (rccode) {	//Main Actions
+					case DDVD_SET_CHAPTER:
 					case DDVD_KEY_PREV_CHAPTER:	//left
-					case DDVD_KEY_LEFT:
-					{
-						int titleNo, chapterNumber, chapterNo;
-						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-						dvdnav_get_number_of_parts(dvdnav, titleNo, &chapterNumber);
-						chapterNo--;
-						if (chapterNo > chapterNumber)
-							chapterNo = 1;
-						if (chapterNo <= 0)
-							chapterNo = chapterNumber;
-						dvdnav_part_play(dvdnav, titleNo, chapterNo);
-						ddvd_play_empty(TRUE);
-						msg = DDVD_SHOWOSD_TIME;
-						break;
-					}
 					case DDVD_KEY_NEXT_CHAPTER:	//right
+					case DDVD_KEY_LEFT:
 					case DDVD_KEY_RIGHT:
 					{
-						int titleNo, chapterNumber, chapterNo;
+						int titleNo, totalChapters, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-						dvdnav_get_number_of_parts(dvdnav, titleNo, &chapterNumber);
-						chapterNo++;
-						if (chapterNo > chapterNumber)
+						dvdnav_get_number_of_parts(dvdnav, titleNo, &totalChapters);
+						if (rccode == DDVD_SET_CHAPTER)
+							ddvd_readpipe(key_pipe, &chapterNo, sizeof(int), 1);
+						else if (rccode == DDVD_KEY_PREV_CHAPTER || rccode == DDVD_KEY_LEFT)
+							chapterNo--;
+						else
+							chapterNo++;
+						if (chapterNo > totalChapters)
 							chapterNo = 1;
 						if (chapterNo <= 0)
-							chapterNo = chapterNumber;
+							chapterNo = totalChapters;
+						printf("LIBDVD: DDVD_SET_CHAPTER %d/%d in title %d\n", chapterNo, totalChapters, titleNo);
 						dvdnav_part_play(dvdnav, titleNo, chapterNo);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
@@ -2457,20 +2450,6 @@ key_play:
 						printf("LIBDVD: DDVD_SET_TITLE %d/%d\n", title, totalTitles);
 						if (title <= totalTitles) {
 							dvdnav_part_play(dvdnav, title, 0);
-							ddvd_play_empty(TRUE);
-							msg = DDVD_SHOWOSD_TIME;
-						}
-						break;
-					}
-					case DDVD_SET_CHAPTER:
-					{
-						int chapter, totalChapters, chapterNo, titleNo;
-						ddvd_readpipe(key_pipe, &chapter, sizeof(int), 1);
-						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
-						dvdnav_get_number_of_parts(dvdnav, titleNo, &totalChapters);
-						printf("LIBDVD: DDVD_SET_CHAPTER %d/%d in title %d\n", chapter, totalChapters, titleNo);
-						if (chapter <= totalChapters) {
-							dvdnav_part_play(dvdnav, titleNo, chapter);
 							ddvd_play_empty(TRUE);
 							msg = DDVD_SHOWOSD_TIME;
 						}
