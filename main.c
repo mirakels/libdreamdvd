@@ -2326,6 +2326,32 @@ key_play:
 							ddvd_trickspeed *= 2;
 						break;
 					}
+					case DDVD_SKIP_FWD:
+					case DDVD_SKIP_BWD:
+					{
+						int skip;
+						ddvd_readpipe(key_pipe, &skip, sizeof(int), 1);
+						if (ddvd_trickmode == TOFF) {
+							uint32_t pos, len;
+							dvdnav_get_position(dvdnav, &pos, &len);
+							printf("LIBDVD: DDVD_SKIP pos=%u len=%u \n", pos, len);
+							// 90000 = 1 Sek.
+							if (!len)
+								len = 1;
+							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000 * skip);
+							printf("LIBDVD: DDVD_SKIP posnew1=%lld\n", posnew);
+							long long int posnew2 = posnew <= 0 ? 0 : (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
+							printf("LIBDVD: DDVD_SKIP posnew2=%lld\n", posnew2);
+							if (len && posnew2 && posnew2 >= len) {	// reached end of movie
+								posnew2 = len - 250;
+								reached_eof = 1;
+							}
+							dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
+							ddvd_lpcm_count = 0;
+							msg = DDVD_SHOWOSD_TIME;
+						}
+						break;
+					}
 					case DDVD_KEY_AUDIO:	//jump to next audio track
 					case DDVD_SET_AUDIO:	//change to given audio track
 					{
@@ -2409,32 +2435,6 @@ key_play:
 					case DDVD_GET_TIME:	// frontend wants actual time
 						msg = DDVD_SHOWOSD_TIME;
 						break;
-					case DDVD_SKIP_FWD:
-					case DDVD_SKIP_BWD:
-					{
-						int skip;
-						ddvd_readpipe(key_pipe, &skip, sizeof(int), 1);
-						if (ddvd_trickmode == TOFF) {
-							uint32_t pos, len;
-							dvdnav_get_position(dvdnav, &pos, &len);
-							printf("LIBDVD: DDVD_SKIP pos=%u len=%u \n", pos, len);
-							// 90000 = 1 Sek.
-							if (!len)
-								len = 1;
-							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000 * skip);
-							printf("LIBDVD: DDVD_SKIP posnew1=%lld\n", posnew);
-							long long int posnew2 = posnew <= 0 ? 0 : (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
-							printf("LIBDVD: DDVD_SKIP posnew2=%lld\n", posnew2);
-							if (len && posnew2 && posnew2 >= len) {	// reached end of movie
-								posnew2 = len - 250;
-								reached_eof = 1;
-							}
-							dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
-							ddvd_lpcm_count = 0;
-							msg = DDVD_SHOWOSD_TIME;
-						}
-						break;
-					}
 					default:
 						break;
 				}
