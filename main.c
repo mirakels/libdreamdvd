@@ -2196,6 +2196,7 @@ send_message:
 			else if (!keydone) {	//Actions inside a Movie
 				switch (rccode) {	//Main Actions
 					case DDVD_KEY_PREV_CHAPTER:	//left
+					case DDVD_KEY_LEFT:
 					{
 						int titleNo, chapterNumber, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
@@ -2211,6 +2212,7 @@ send_message:
 						break;
 					}
 					case DDVD_KEY_NEXT_CHAPTER:	//right
+					case DDVD_KEY_RIGHT:
 					{
 						int titleNo, chapterNumber, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
@@ -2226,6 +2228,7 @@ send_message:
 						break;
 					}
 					case DDVD_KEY_PREV_TITLE:
+					case DDVD_KEY_DOWN:
 					{
 						int titleNo, titleNumber, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
@@ -2241,6 +2244,7 @@ send_message:
 						break;
 					}
 					case DDVD_KEY_NEXT_TITLE:
+					case DDVD_KEY_UP:
 					{
 						int titleNo, titleNumber, chapterNo;
 						dvdnav_current_title_info(dvdnav, &titleNo, &chapterNo);
