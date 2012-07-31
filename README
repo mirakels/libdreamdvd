@@ -1,6 +1,6 @@
-This is a clone of the Dream Multimedia lib dreamdvd librarry
-The library forms an interface/api between libdvdread and the enigma2
-dvd handling code.
+This is a clone of the Dream Multimedia lib dreamdvd library
+The library forms an interface/api between libdvdread/libdvdnav
+and the enigma2 dvd handling code.
 
 This clone is made as I made a lot of changes and have no write
 access to the original repository. And because the server for the
@@ -9,26 +9,31 @@ clone on github.
 
 The changes mainly optimize menu handling and subtitle display.
 The issue is that menu buttons are often displayed way to often
-and somtimes do not appear or seem to dispaly repeatedline giving a
+and sometimes do not appear or seem to display repeatedly giving a
 stroboscope effect. Sometimes subtitles are displayed to early. The
 reaseon for most of this is that audio/video handling is handled by
-hardware that uses /caching/buffers capuing delays. Menus and subtitles
+hardware that uses caching/buffers creating delays. Menus and subtitles
 are on OSD which is taken care of by the libdreamdvd libray itself.
+Synchronizing OSD display with the hardware delays is a hassle...
 
-Also the 'resume' function does not work.
+Also the 'resume' function did not work.
 
-Finally many cosmet changes, small bug fixes and refactored code
-to remove duplicat code.
+Finally many cosmetic changes, small bug fixes and refactored code
+to remove duplicate code and make things more clear.
 
 The current status is
 - resume function works again
 - menu buttons have less stroboscope effect and now always
-  show correctly (99%)  but still are shown to soon sometimes.
+  show correctly (99%) but still are shown to soon sometimes.
 - subtitle still may be displayed to soon.
 
-I have  code that fixes mostly syunchronize buttons/subtiles with the
-video output but it still fails sometimes  or result in problems displaying
-the wrong vidoe data when navigating through menus.
+I have code that mostly fixes buttons/subtitle sync with the
+video output but it still fails sometimes or result in problems
+displaying the wrong video data when navigating through menus.
+
+So... usable but work in progress
+
+Any comments hints patches are welcome
 
 -Mirakels
 mirakels@users.sourceforge.net
