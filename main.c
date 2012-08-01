@@ -2040,7 +2040,9 @@ send_message:
 		}
 
 		if (ddvd_clear_screen) {
-			//printf("LIBDVD: previous area to wipe: %d %d %d %d\n", last_blit_area.x_start, last_blit_area.x_end, last_blit_area.y_start, last_blit_area.y_end);
+			//printf("LIBDVD: previous area to wipe: %d %d %d %d\n",
+			//			last_blit_area.x_start, last_blit_area.x_end,
+			//			last_blit_area.y_start, last_blit_area.y_end);
 			memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2173,7 +2175,7 @@ send_message:
 						dvdnav_button_activate(dvdnav, pci);
 						break;
 					case DDVD_KEY_EXIT:	//Exit
-						printf("LIBDVD_KEY_EXIT (menu)\n");
+						printf("LIBDVD: DDVD_KEY_EXIT (menu)\n");
 						playerconfig->resume_title = 0;
 						playerconfig->resume_chapter = 0;
 						playerconfig->resume_block = 0;
@@ -2222,8 +2224,8 @@ send_message:
 					}
 					case DDVD_SET_TITLE:
 					case DDVD_KEY_PREV_TITLE:
-					case DDVD_KEY_DOWN:
 					case DDVD_KEY_NEXT_TITLE:
+					case DDVD_KEY_DOWN:
 					case DDVD_KEY_UP:
 					{
 						int titleNo, totalTitles, chapterNo;
@@ -2334,14 +2336,12 @@ key_play:
 						if (ddvd_trickmode == TOFF) {
 							uint32_t pos, len;
 							dvdnav_get_position(dvdnav, &pos, &len);
-							printf("LIBDVD: DDVD_SKIP pos=%u len=%u \n", pos, len);
 							// 90000 = 1 Sek.
 							if (!len)
 								len = 1;
 							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000 * skip);
-							printf("LIBDVD: DDVD_SKIP posnew1=%lld\n", posnew);
 							long long int posnew2 = posnew <= 0 ? 0 : (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
-							printf("LIBDVD: DDVD_SKIP posnew2=%lld\n", posnew2);
+							printf("LIBDVD: DDVD_SKIP pos=%u len=%u posnew1=%lld  posnew2=%lld\n", pos, len, posnew, posnew2);
 							if (len && posnew2 && posnew2 >= len) {	// reached end of movie
 								posnew2 = len - 250;
 								reached_eof = 1;
