@@ -2420,10 +2420,11 @@ key_play:
 						int num = 0, current = 0;
 						dvdnav_get_angle_info(dvdnav, &current, &num);
 						if (rccode == DDVD_KEY_ANGLE) {
-							if(num != 0) {
+							if (num != 0) {
 								current++;
-								if(current > num)
+								if (current > num)
 									current = 1;
+							    dvdnav_angle_change(dvdnav, current);
 							}
 						}
 						msg = DDVD_SHOWOSD_ANGLE;
