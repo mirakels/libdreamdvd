@@ -1,8 +1,8 @@
-This is a clone of the Dream Multimedia lib dreamdvd library
+This is a fork of the Dream Multimedia lib dreamdvd library
 The library forms an interface/api between libdvdread/libdvdnav
 and the enigma2 dvd handling code.
 
-This clone is made as I made a lot of changes and have no write
+This fork is made as I made a lot of changes and have no write
 access to the original repository. And because the server for the
 original repo does not always seem to be online I decided to make
 clone on github.
