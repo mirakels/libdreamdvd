@@ -1241,7 +1241,7 @@ send_message:
 					}
 					else if ((buf[14 + 3]) == 0xC0 + audio_id) {	// mpeg audio
 						if (audio_type != DDVD_MPEG) {
-							//printf("Switch to MPEG Audio\n");
+							//printf("LIBDVD: Switch to MPEG Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("LIBDVD: AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
@@ -1271,7 +1271,7 @@ send_message:
 						}
 
 						if (audio_type != DDVD_LPCM) {
-							//printf("Switch to LPCM Audio\n");
+							//printf("LIBDVD: Switch to LPCM Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("LIBDVD: AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, lpcm_mode) < 0)
@@ -1339,7 +1339,7 @@ send_message:
 					}
 					else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x88 + audio_id) {	// dts audio
 						if (audio_type != DDVD_DTS) {
-							//printf("Switch to DTS Audio (thru)\n");
+							//printf("LIBDVD: Switch to DTS Audio (thru)\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 								perror("LIBDVD: AUDIO_SET_AV_SYNC");
 #ifdef CONVERT_TO_DVB_COMPLIANT_DTS
@@ -1375,7 +1375,7 @@ send_message:
 					}
 					else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x80 + audio_id) {	// ac3 audio
 						if (audio_type != DDVD_AC3) {
-							//printf("Switch to AC3 Audio\n");
+							//printf("LIBDVD: Switch to AC3 Audio\n");
 							if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 									perror("LIBDVD: AUDIO_SET_AV_SYNC");
@@ -1752,7 +1752,7 @@ send_message:
 						playerconfig->resume_spu_id = 0;
 						playerconfig->resume_spu_lock = 0;
 					}
-					// multiple angels ?
+					// multiple angles ?
 					int num = 0, current = 0;
 					dvdnav_get_angle_info(dvdnav, &current, &num);
 					msg = DDVD_SHOWOSD_ANGLE;
@@ -1783,7 +1783,7 @@ send_message:
 
 			case DVDNAV_STOP:
 				/* Playback should end here. */
-				printf("DVDNAV_STOP\n");
+				printf("LIBDVD: DVDNAV_STOP\n");
 				playerconfig->resume_title = 0;
 				playerconfig->resume_chapter = 0;
 				playerconfig->resume_block = 0;
@@ -1795,7 +1795,7 @@ send_message:
 				break;
 
 			default:
-				printf("DVDNAV_Unknown event (%i)\n", event);
+				printf("LIBDVD: DVDNAV_Unknown event (%i)\n", event);
 				finished = 1;
 				break;
 			}
@@ -2062,7 +2062,7 @@ send_message:
 				// decide which resize routine we should use
 				// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
 				// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
-//				printf("resizing\n");
+//				printf("LIBDVD: resizing\n");
 				resized = 1;
 				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres,
 												x_offset, y_offset, blit_area.x_start, blit_area.x_end,
