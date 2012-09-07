@@ -666,7 +666,6 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 	struct ddvd_resize_return blit_area;
 
-	memset(ddvd_lbb, 0, 720 * 576);
 	memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen
 	blit_area.x_start = blit_area.y_start = 0;
 	blit_area.x_end = ddvd_screeninfo_xres - 1;
