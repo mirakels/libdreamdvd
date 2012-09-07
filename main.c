@@ -953,7 +953,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		/* the main reading function */
 		if (ddvd_playmode == PLAY) {	//skip when not in play mode
 			// trickmode
-			if (ddvd_trickmode) {
+			if (ddvd_trickmode != TOFF) {
 				if (ddvd_trick_timer_end <= ddvd_get_time()) {
 					if (ddvd_trickmode == FASTBW) {	//jump back ?
 						uint32_t pos, len;
@@ -2265,13 +2265,13 @@ send_message:
 					}
 					case DDVD_KEY_PLAY:	// Play
 					{
-						if (ddvd_playmode == PAUSE || ddvd_trickmode) {
+						if (ddvd_playmode == PAUSE || ddvd_trickmode != TOFF) {
 							ddvd_playmode = PLAY;
 key_play:
 #if CONFIG_API_VERSION == 1
 							ddvd_device_clear();
 #endif
-							if (ddvd_trickmode && !ismute)
+							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 									perror("LIBDVD: AUDIO_SET_MUTE");
 							ddvd_trickmode = TOFF;
