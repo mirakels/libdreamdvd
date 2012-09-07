@@ -1470,18 +1470,13 @@ send_message:
 
 						if (buf[14 + 7] & 128) {
 							/* damn gcc bug */
-#if CONFIG_API_VERSION == 3
 							spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
 							spts |= buf[14 + 10] << 22;
 							spts |= (buf[14 + 11] >> 1) << 15;
 							spts |= buf[14 + 12] << 7;
 							spts |= (buf[14 + 13] >> 1);
-#else
-							spts = (buf[14 + 9] >> 1) << 29;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
-							spts |= buf[14 + 10] << 21;
-							spts |= (buf[14 + 11] >> 1) << 14;
-							spts |= buf[14 + 12] << 6;
-							spts |= buf[14 + 13] >> 2;
+#if CONFIG_API_VERSION == 1
+							spts >>= 1;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
 #endif
 							//printf("LIBDVD: SPTS=%X\n",(int)spts);
 						}
