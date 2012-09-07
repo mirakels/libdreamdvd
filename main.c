@@ -1861,7 +1861,7 @@ send_message:
 //			printf("[SPU] previous bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
-			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, spu_backbuffer, tmplen, spts));	// decode
+			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, spu_backbuffer, spts));	// decode
 //			printf("[SPU] merged   bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
@@ -2645,7 +2645,7 @@ static void ddvd_device_clear(void)
 }
 
 // SPU Decoder
-static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t * buffer, int len, unsigned long long pts)
+static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t * buffer, unsigned long long pts)
 {
 	int x1spu, x2spu, y1spu, y2spu, xspu, yspu;
 	int offset[2], param_len;
