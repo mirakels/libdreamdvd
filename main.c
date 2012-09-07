@@ -2142,8 +2142,8 @@ send_message:
 				case DDVD_UNSET_MUTE:
 					ismute = 0;
 					break;
-				case DDVD_KEY_MENU:     //Dream
-				case DDVD_KEY_AUDIOMENU:        //Audio
+				case DDVD_KEY_MENU:	//Dream
+				case DDVD_KEY_AUDIOMENU:	//Audio
 					if (dvdnav_menu_call(dvdnav, rccode == DDVD_KEY_MENU ? DVD_MENU_Root : DVD_MENU_Audio) == DVDNAV_STATUS_OK)
 						ddvd_play_empty(TRUE);
 					break;
@@ -2424,7 +2424,7 @@ key_play:
 								current++;
 								if (current > num)
 									current = 1;
-							    dvdnav_angle_change(dvdnav, current);
+								dvdnav_angle_change(dvdnav, current);
 							}
 						}
 						msg = DDVD_SHOWOSD_ANGLE;
@@ -2747,7 +2747,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 	if (i + 6 <= size) {
 		if (buffer[i + 5] == 0x02 && buffer[i + 6] == 0xFF) {
 			display_time = ((buffer[i + 1] << 8) + buffer[i + 2]);
-			//printf("LIBDVD: Display Time: %d\n",ddvd_display_time);
+			//printf("LIBDVD: Display Time: %d\n", ddvd_display_time);
 		}
 	}
 
