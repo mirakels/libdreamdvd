@@ -487,25 +487,6 @@ void ddvd_get_last_framerate(struct ddvd *pconfig, int *framerate)
 	*framerate = pconfig->last_framerate.framerate;
 }
 
-struct ddvd_spu_return merge(struct ddvd_spu_return a, struct ddvd_spu_return b)
-{
-	struct ddvd_spu_return r;
-	r = b;
-
-	if (a.x_start != a.x_end || a.y_start != a.y_end) {
-		/* union old and new area */
-		if (a.x_start < r.x_start)
-			r.x_start = a.x_start;
-		if (a.y_start < r.y_start)
-			r.y_start = a.y_start;
-		if (a.x_end > r.x_end)
-			r.x_end = a.x_end;
-		if (a.y_end > r.y_end)
-			r.y_end = a.y_end;
-	}
-	return r;
-}
-
 static int calc_x_scale_offset(int dvd_aspect, int tv_mode, int tv_mode2, int tv_aspect)
 {
 	int x_offset=0;
@@ -813,6 +794,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int report_audio_info = 0;
 
 	struct ddvd_spu_return last_spu_return;
+	struct ddvd_spu_return cur_spu_return;
 	struct ddvd_resize_return last_blit_area;
 	memcpy(&last_blit_area, &blit_area, sizeof(struct ddvd_resize_return));
 	last_spu_return.x_start = last_spu_return.y_start = 0;
@@ -1851,21 +1833,14 @@ send_message:
 //		printf("LIBDVD: pts %d, spu = %d/%d, spu_backpts = %d\n", (int)pts, (int)ddvd_spu_play, (int)ddvd_spu_ind, (int) spupts);
 		if (ddvd_spu_play < ddvd_spu_ind && (pts >= spupts || in_menu)) {
 #endif
-			// we dont support overlapping spu timers yet,
-			// so we have to clear the screen if there is such a case
-			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
-				ddvd_clear_screen = 1;
-
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
-			/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
-//			printf("[SPU] previous bbox: %d %d %d %d\n",
-//				last_spu_return.x_start, last_spu_return.x_end,
-//				last_spu_return.y_start, last_spu_return.y_end);
-			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts));	// decode
+			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts); // decode
 			ddvd_spu_play++;
-//			printf("[SPU] merged   bbox: %d %d %d %d\n",
-//				last_spu_return.x_start, last_spu_return.x_end,
-//				last_spu_return.y_start, last_spu_return.y_end);
+
+//			printf("LIBDVD: SPU current=%d spupts=%llu bbox: %d %d %d %d\n",
+//				ddvd_spu_play, spupts,
+//				cur_spu_return.x_start, cur_spu_return.x_end,
+//				cur_spu_return.y_start, cur_spu_return.y_end);
 
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				// highlight/button
@@ -1880,11 +1855,16 @@ send_message:
 			}
 			else {
 				// subtitle
+				// we dont support overlapping spu timers yet,
+				// so we have to clear the screen if there is such a case
+				if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
+					ddvd_clear_screen = 1;
+
 				ddvd_lbb_changed = 1;
 				// set timer
-				if (last_spu_return.display_time > 0) {
+				if (cur_spu_return.display_time > 0) {
 					ddvd_spu_timer_active = 1;
-					ddvd_spu_timer_end = ddvd_get_time() + last_spu_return.display_time * 10;	//ms
+					ddvd_spu_timer_end = ddvd_get_time() + cur_spu_return.display_time * 10;	//ms
 				}
 				else
 					ddvd_spu_timer_active = 0;
@@ -1892,8 +1872,8 @@ send_message:
 				// dont display SPU if spu sets the HIDE command
 				// or the actual SPU track is marked as hide (bit 7)
 				// and the packet had no FORCE command
-				if (last_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) &&
-						last_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
+				if (cur_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) &&
+						cur_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
 					ddvd_lbb_changed = 0;
 					ddvd_spu_timer_active = 0;
 				}
@@ -1923,23 +1903,23 @@ send_message:
 							&ddvd_resize_pixmap_xbpp : &ddvd_resize_pixmap_xbpp_smooth;
 				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);    //clear backbuffer ..
 				int i = 0;
-				for (i = last_spu_return.y_start; i < last_spu_return.y_end; ++i)
-					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + last_spu_return.x_start) * ddvd_screeninfo_bypp,
-										ddvd_lbb + i * 720 + last_spu_return.x_start,
-										last_spu_return.x_end - last_spu_return.x_start);
+				for (i = cur_spu_return.y_start; i < cur_spu_return.y_end; ++i)
+					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + cur_spu_return.x_start) * ddvd_screeninfo_bypp,
+										ddvd_lbb + i * 720 + cur_spu_return.x_start,
+										cur_spu_return.x_end - cur_spu_return.x_start);
 			}
 
-			blit_area.x_start = last_spu_return.x_start;
-			blit_area.x_end = last_spu_return.x_end;
-			blit_area.y_start = last_spu_return.y_start;
-			blit_area.y_end = last_spu_return.y_end;
+			blit_area.x_start = cur_spu_return.x_start;
+			blit_area.x_end = cur_spu_return.x_end;
+			blit_area.y_start = cur_spu_return.y_start;
+			blit_area.y_end = cur_spu_return.y_end;
 			if (!ddvd_spu_timer_active) {
 				/* in case this is the last action for this subtitle's bbox
 				   (i.e. no timer has been set), then we will clear the bbox.
 				   otherwise, we will leave it there, so it will be contained
 				   in the next update as well. */
-				last_spu_return.x_start = last_spu_return.x_end = 0;
-				last_spu_return.y_start = last_spu_return.y_end = 0;
+				cur_spu_return.x_start = cur_spu_return.x_end = 0;
+				cur_spu_return.y_start = cur_spu_return.y_end = 0;
 			}
 
 			ddvd_lbb_changed = 0;
@@ -2079,6 +2059,7 @@ send_message:
 			memcpy(&last_blit_area, &blit_area, sizeof(struct ddvd_resize_return)); // safe blit area for next wipe
 			msg = msg_old;
 			draw_osd = 0;
+			last_spu_return = cur_spu_return;
 		}
 
 		// final menu status check
