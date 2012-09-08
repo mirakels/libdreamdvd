@@ -1866,24 +1866,6 @@ send_message:
 			ddvd_display_time = last_spu_return.display_time;
 			ddvd_lbb_changed = 1;
 
-			struct ddvd_color colnew;
-			int ctmp;
-			msg = DDVD_COLORTABLE_UPDATE;
-			if (ddvd_screeninfo_bypp == 1)
-				safe_write(message_pipe, &msg, sizeof(int));
-			else
-				ddvd_resize_pixmap = (ddvd_screeninfo_xres > 720) ? // set resize function
-							&ddvd_resize_pixmap_xbpp : &ddvd_resize_pixmap_xbpp_smooth;
-			for (ctmp = 0; ctmp < 4; ctmp++) {
-				colnew.blue = ddvd_bl[ctmp + 252];
-				colnew.green = ddvd_gn[ctmp + 252];
-				colnew.red = ddvd_rd[ctmp + 252];
-				colnew.trans = ddvd_tr[ctmp + 252];
-				if (ddvd_screeninfo_bypp == 1)
-					safe_write(message_pipe, &colnew, sizeof(struct ddvd_color));
-			}
-			msg = DDVD_NULL;
-
 			// set timer
 			if (ddvd_display_time > 0) {
 				ddvd_spu_timer_active = 1;
@@ -1912,11 +1894,26 @@ send_message:
 			}
 		}
 
-		// spu handling
+		// subtitle handling
 		if (ddvd_lbb_changed == 1) {
-			if (ddvd_screeninfo_bypp == 1)
+			if (ddvd_screeninfo_bypp == 1) {
+				struct ddvd_color colnew;
+				int ctmp;
+				msg = DDVD_COLORTABLE_UPDATE;
+				safe_write(message_pipe, &msg, sizeof(int));
+				for (ctmp = 0; ctmp < 4; ctmp++) {
+					colnew.blue = ddvd_bl[ctmp + 252];
+					colnew.green = ddvd_gn[ctmp + 252];
+					colnew.red = ddvd_rd[ctmp + 252];
+					colnew.trans = ddvd_tr[ctmp + 252];
+					safe_write(message_pipe, &colnew, sizeof(struct ddvd_color));
+				}
+				msg = DDVD_NULL;
 				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
+			}
 			else {
+				ddvd_resize_pixmap = (ddvd_screeninfo_xres > 720) ? // set resize function
+							&ddvd_resize_pixmap_xbpp : &ddvd_resize_pixmap_xbpp_smooth;
 				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);    //clear backbuffer ..
 				int i = 0;
 				for (i = last_spu_return.y_start; i < last_spu_return.y_end; ++i)
@@ -1924,6 +1921,7 @@ send_message:
 										ddvd_lbb + i * 720 + last_spu_return.x_start,
 										last_spu_return.x_end - last_spu_return.x_start);
 			}
+
 			blit_area.x_start = last_spu_return.x_start;
 			blit_area.x_end = last_spu_return.x_end;
 			blit_area.y_start = last_spu_return.y_start;
