@@ -985,6 +985,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 					}
 					ddvd_trick_timer_end = ddvd_get_time() + 300;
 					ddvd_lpcm_count = 0;
+					ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 				}
 			}
 
@@ -1607,6 +1608,7 @@ send_message:
 						count_tmp = 0;
 					count_tmp--;
 				}
+				ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 
 				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 				if (spu_lang == 0xFFFF) {
@@ -2201,6 +2203,7 @@ send_message:
 						dvdnav_part_play(dvdnav, titleNo, chapterNo);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
+						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						break;
 					}
 					case DDVD_SET_TITLE:
@@ -2226,6 +2229,7 @@ send_message:
 						dvdnav_part_play(dvdnav, titleNo, 1);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
+						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						break;
 					}
 					case DDVD_KEY_PAUSE:	// Pause
@@ -2330,6 +2334,7 @@ key_play:
 							dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
 							ddvd_lpcm_count = 0;
 							msg = DDVD_SHOWOSD_TIME;
+							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						}
 						break;
 					}
@@ -2386,6 +2391,7 @@ key_play:
 							spu_lang = 0x2D2D;	// SPU "off"
 							spu_active_id = -1;
 							spu_id_logical = -1;
+							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						}
 						spu_lock = 1;
 						msg = DDVD_SHOWOSD_SUBTITLE;
