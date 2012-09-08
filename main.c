@@ -626,40 +626,41 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		ddvd_resize_pixmap = &ddvd_resize_pixmap_1bpp;
 
 	uint8_t *last_iframe = NULL;
-	uint8_t *spu_buffer = NULL;
-	uint8_t *spu_backbuffer = NULL;
 
 	// init backbuffer (SPU)
 	ddvd_lbb = malloc(720 * 576);	// the spu backbuffer is always max DVD PAL 720x576 pixel (NTSC 720x480)
 	if (ddvd_lbb == NULL) {
-		perror("LIBDVD: SPU-Backbuffer <mem allocation failed>");
+		perror("LIBDVD: SPU decode buffer <mem allocation failed>");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
+
 	ddvd_lbb2 = malloc(ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp);
 	if (ddvd_lbb2 == NULL) {
-		perror("LIBDVD: SPU-Backbuffer2 <mem allocation failed>");
+		perror("LIBDVD: SPU to screen buffer <mem allocation failed>");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
+
+#define SPU_BUFLEN   (2 * (128 * 1024))
+	unsigned long long spu_backpts[NUM_SPU_BACKBUFFER];
+	unsigned char *ddvd_spu[NUM_SPU_BACKBUFFER];
+	{   int  i;
+		for (i = 0; i < NUM_SPU_BACKBUFFER; i++)  {
+			ddvd_spu[i] = malloc(SPU_BUFLEN);    // buffers for decoded SPU packets
+			if (ddvd_spu[i] == NULL) {
+				perror("LIBDVD: SPU backbuffer <mem allocation failed>");
+				res = DDVD_NOMEM;
+				goto err_malloc;
+			}
+		}
+	}
+	int ddvd_spu_ind = 0;
+	int ddvd_spu_play = 0;
 
 	last_iframe = malloc(320 * 1024);
 	if (last_iframe == NULL) {
 		perror("LIBDVD: malloc last_iframe");
-		res = DDVD_NOMEM;
-		goto err_malloc;
-	}
-
-	spu_buffer = malloc(2 * (128 * 1024));
-	if (spu_buffer == NULL) {
-		perror("LIBDVD: malloc spubuffer");
-		res = DDVD_NOMEM;
-		goto err_malloc;
-	}
-
-	spu_backbuffer = malloc(NUM_SPU_BACKBUFFER * 2 * (128 * 1024));
-	if (spu_backbuffer == NULL) {
-		perror("LIBDVD: malloc spu_backbuffer");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
@@ -913,7 +914,6 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	ddvd_lbb_changed = 0;
 	ddvd_clear_screen = 0;
 
-	unsigned long long spu_backpts[NUM_SPU_BACKBUFFER];
 	int have_highlight = 0;
 	dvdnav_highlight_event_t highlight_event;
 
@@ -1464,9 +1464,6 @@ send_message:
 						}
 					}
 					else if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xE0) == 0x20 && ((buf[14 + buf[14 + 8] + 9]) & 0x1F) == spu_active_id) {	// SPU packet
-						memcpy(spu_buffer + ddvd_spu_ptr, buf + buf[22] + 14 + 10, 2048 - (buf[22] + 14 + 10));
-						ddvd_spu_ptr += 2048 - (buf[22] + 14 + 10);
-
 						if (buf[14 + 7] & 128) {
 							/* damn gcc bug */
 							spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
@@ -1477,27 +1474,28 @@ send_message:
 #if CONFIG_API_VERSION == 1
 							spts >>= 1;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
 #endif
-							//printf("LIBDVD: SPTS=%X\n",(int)spts);
+							//printf("LIBDVD: SPTS=%llu\n",(int)spts);
 						}
 
-						int spulen = spu_buffer[0] << 8 | spu_buffer[1];
+						int i = ddvd_spu_ind % NUM_SPU_BACKBUFFER;
+						if (ddvd_spu_ind - ddvd_spu_play >= NUM_SPU_BACKBUFFER) {
+							printf("LIBDVD: SPU buffers full, skipping SPU for spts=%llu\n", spu_backpts[i]);
+							ddvd_spu_play = ddvd_spu_ind - NUM_SPU_BACKBUFFER + 1;
+						}
+
+						int pck_len = 2048 - (buf[22] + 14 + 10);
+						if (ddvd_spu_ptr + pck_len > SPU_BUFLEN)
+							printf("LIBDVD: SPU frame to long (%d > %d)\n", ddvd_spu_ptr + pck_len, SPU_BUFLEN);
+						else {
+							memcpy(ddvd_spu[i] + ddvd_spu_ptr, buf + buf[22] + 14 + 10, pck_len);
+							ddvd_spu_ptr += pck_len;
+						}
+
+						int spulen = ddvd_spu[i][0] << 8 | ddvd_spu[i][1];
 						if (ddvd_spu_ptr >= spulen) {	// SPU packet complete ?
-							if (ddvd_spu_backnr == NUM_SPU_BACKBUFFER) {	// backbuffer already full ?
-								printf("LIBDVD: dropped SPU frame\n");
-								int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
-								memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete oldest SPU packet
-								int i;
-								for (i = 0; i < NUM_SPU_BACKBUFFER - 1; ++i)
-									spu_backpts[i] = spu_backpts[i + 1];
-								ddvd_spu_backnr = NUM_SPU_BACKBUFFER - 1;
-								ddvd_spu_backptr -= tmplen;
-							}
-
-							memcpy(spu_backbuffer + ddvd_spu_backptr, spu_buffer, spulen);	// copy into backbuffer
-							spu_backpts[ddvd_spu_backnr++] = spts;	// store pts
-							ddvd_spu_backptr += spulen;	// increase ptr
-
+							spu_backpts[i] = spts;	// store pts
 							ddvd_spu_ptr = 0;
+							ddvd_spu_ind++;
 						}
 					}
 				}
@@ -1804,11 +1802,12 @@ send_message:
 		if (ioctl(ddvd_output_fd, VIDEO_GET_PTS, &tpts) < 0)
 			perror("LIBDVD: VIDEO_GET_PTS");
 		pts = (unsigned long long)tpts;
+		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
 		// we only have a 32bit pts on vulcan/pallas (instead of 33bit) so we need some
 		// tolerance on syncing SPU for menus so on non animated menus the buttons will
 		// be displayed to soon, but we we have to accept it
-		signed long long diff = spu_backpts[0] - pts;
-		if (ddvd_spu_backnr > 0 && (diff <= 0xFF || in_menu)) {
+		signed long long diff = spupts - pts;
+		if (ddvd_spu_play < ddvd_spu_ind && (diff <= 0xFF || in_menu)) {
 #else
 		struct video_event event;
 		if (!ioctl(ddvd_fdvideo, VIDEO_GET_EVENT, &event)) {
@@ -1846,11 +1845,10 @@ send_message:
 		}
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
 			perror("LIBDVD: VIDEO_GET_PTS");
-//		printf("LIBDVD: pts %d, dvd_spu_backnr = %d, spu_backpts = %d\n", (int)pts, (int)ddvd_spu_backnr, (int) spu_backpts[0]);
-		if (ddvd_spu_backnr > 0 && (pts >= spu_backpts[0] || in_menu)) {
+		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
+//		printf("LIBDVD: pts %d, spu = %d/%d, spu_backpts = %d\n", (int)pts, (int)ddvd_spu_play, (int)ddvd_spu_ind, (int) spupts);
+		if (ddvd_spu_play < ddvd_spu_ind && (pts >= spupts || in_menu)) {
 #endif
-			int tmplen = (spu_backbuffer[0] << 8 | spu_backbuffer[1]);
-
 			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
 				ddvd_clear_screen = 1;
@@ -1860,7 +1858,8 @@ send_message:
 //			printf("[SPU] previous bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
-			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, spu_backbuffer, spts));	// decode
+			last_spu_return = merge(last_spu_return, ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts));	// decode
+			ddvd_spu_play++;
 //			printf("[SPU] merged   bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
@@ -1884,16 +1883,6 @@ send_message:
 					safe_write(message_pipe, &colnew, sizeof(struct ddvd_color));
 			}
 			msg = DDVD_NULL;
-
-			memcpy(spu_backbuffer, spu_backbuffer + tmplen, ddvd_spu_backptr - tmplen);	// delete SPU packet
-			int i;
-			for (i = 0; i < NUM_SPU_BACKBUFFER - 1; ++i)
-				spu_backpts[i] = spu_backpts[i + 1];
-
-			ddvd_spu_backnr--;
-			ddvd_spu_backptr -= tmplen;
-
-//			printf("LIBDVD: SPU backnr = %d, backptr = %d\n", ddvd_spu_backnr, ddvd_spu_backptr);
 
 			// set timer
 			if (ddvd_display_time > 0) {
@@ -2482,16 +2471,15 @@ err_open_output_fd:
 
 err_malloc:
 	// clean up
+	for (i = 0; i < NUM_SPU_BACKBUFFER; i++)
+		if (ddvd_spu[i] != NULL)
+			free(ddvd_spu[i]);
 	if (ddvd_lbb != NULL)
 		free(ddvd_lbb);
 	if (ddvd_lbb2 != NULL)
 		free(ddvd_lbb2);
 	if (last_iframe != NULL)
 		free(last_iframe);
-	if (spu_buffer != NULL)
-		free(spu_buffer);
-	if (spu_backbuffer != NULL)
-		free(spu_backbuffer);
 
 #if CONFIG_API_VERSION == 3
 	ddvd_unset_pcr_offset();
