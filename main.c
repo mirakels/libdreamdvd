@@ -2228,6 +2228,7 @@ send_message:
 								perror("LIBDVD: VIDEO_FREEZE");
 							msg = DDVD_SHOWOSD_STATE_PAUSE;
 							safe_write(message_pipe, &msg, sizeof(int));
+							ddvd_wait_for_user = 1; // don't waste cpu during pause
 							break;
 						}
 						else if (ddvd_playmode != PAUSE)
@@ -2237,6 +2238,8 @@ send_message:
 					case DDVD_KEY_PLAY:	// Play
 					{
 						if (ddvd_playmode == PAUSE || ddvd_trickmode != TOFF) {
+							if (ddvd_playmode == PAUSE)
+								ddvd_wait_for_user = 0;
 							ddvd_playmode = PLAY;
 key_play:
 #if CONFIG_API_VERSION == 1
