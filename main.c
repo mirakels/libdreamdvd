@@ -2738,7 +2738,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 	if (i + 6 <= size) {
 		if (buffer[i + 5] == 0x02 && buffer[i + 6] == 0xFF) {
 			display_time = ((buffer[i + 1] << 8) + buffer[i + 2]);
-			//printf("LIBDVD: Display Time: %d\n", ddvd_display_time);
+			//printf("LIBDVD: Display Time: %d\n", display_time);
 		}
 	}
 
