@@ -2324,7 +2324,7 @@ key_play:
 							// 90000 = 1 Sek.
 							if (!len)
 								len = 1;
-							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000 * skip) + (pts - vpts);
+							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000 * skip) + (vpts > pts ? pts - vpts : 0);
 							long long int posnew2 = posnew <= 0 ? 0 : (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
 							printf("LIBDVD: DDVD_SKIP skip=%d pos=%u len=%u posnew1=%lld posnew2=%lld\n", skip, pos, len, posnew, posnew2);
 							if (posnew2 >= len) {	// reached end of movie
