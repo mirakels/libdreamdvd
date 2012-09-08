@@ -1851,12 +1851,13 @@ send_message:
 //		printf("LIBDVD: pts %d, spu = %d/%d, spu_backpts = %d\n", (int)pts, (int)ddvd_spu_play, (int)ddvd_spu_ind, (int) spupts);
 		if (ddvd_spu_play < ddvd_spu_ind && (pts >= spupts || in_menu)) {
 #endif
-			// we dont support overlapping spu timers yet, so we have to clear the screen if there is such a case
+			// we dont support overlapping spu timers yet,
+			// so we have to clear the screen if there is such a case
 			if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
 				ddvd_clear_screen = 1;
 
+			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
 			/* the last subtitle's bbox is still in last_spu_return, so this subtitle will enlarge this bbox. */
-			memset(ddvd_lbb, 0, 720 * 576);	//clear backbuffer ..
 //			printf("[SPU] previous bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
@@ -1865,25 +1866,9 @@ send_message:
 //			printf("[SPU] merged   bbox: %d %d %d %d\n",
 //				last_spu_return.x_start, last_spu_return.x_end,
 //				last_spu_return.y_start, last_spu_return.y_end);
-			ddvd_display_time = last_spu_return.display_time;
-			ddvd_lbb_changed = 1;
-
-			// set timer
-			if (ddvd_display_time > 0) {
-				ddvd_spu_timer_active = 1;
-				ddvd_spu_timer_end = ddvd_get_time() + ddvd_display_time * 10;	//ms
-			}
-			else
-				ddvd_spu_timer_active = 0;
-
-			// dont display SPU if spu sets the HIDE command or the actual SPU track is marked as hide (bit 7) and the packet had no FORCE command
-			if (last_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) &&
-					last_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
-				ddvd_lbb_changed = 0;
-				ddvd_spu_timer_active = 0;
-			}
 
 			if (pci->hli.hl_gi.btn_ns > 0) {
+				// highlight/button
 				int buttonN;
 				dvdnav_get_current_highlight(dvdnav, &buttonN);
 				if (buttonN == 0)
@@ -1891,9 +1876,29 @@ send_message:
 				if (buttonN > pci->hli.hl_gi.btn_ns)
 					buttonN = pci->hli.hl_gi.btn_ns;
 				dvdnav_button_select(dvdnav, pci, buttonN);
-				ddvd_lbb_changed = 0;
 				have_highlight = 1;
 			}
+			else {
+				// subtitle
+				ddvd_lbb_changed = 1;
+				// set timer
+				if (last_spu_return.display_time > 0) {
+					ddvd_spu_timer_active = 1;
+					ddvd_spu_timer_end = ddvd_get_time() + last_spu_return.display_time * 10;	//ms
+				}
+				else
+					ddvd_spu_timer_active = 0;
+
+				// dont display SPU if spu sets the HIDE command
+				// or the actual SPU track is marked as hide (bit 7)
+				// and the packet had no FORCE command
+				if (last_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) &&
+						last_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
+					ddvd_lbb_changed = 0;
+					ddvd_spu_timer_active = 0;
+				}
+			}
+
 		}
 
 		// subtitle handling
