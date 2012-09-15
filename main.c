@@ -1969,16 +1969,18 @@ send_message:
 
 			if (libdvdnav_workaround) {
 				// get and set clut for actual button
-				unsigned char tmp, tmp2;
-				struct ddvd_color colnew;
 				int i;
-				msg = DDVD_COLORTABLE_UPDATE;
-				if (ddvd_screeninfo_bypp == 1)
+				if (ddvd_screeninfo_bypp == 1) {
+					msg = DDVD_COLORTABLE_UPDATE;
 					safe_write(message_pipe, &msg, sizeof(int));
+				}
 				else
 					ddvd_resize_pixmap = &ddvd_resize_pixmap_xbpp; // set resize function
-				//CHANGE COLORMAP
+
+				//CHANGE COLORMAP from highlight data, used in ddvd_blit_to_argb()
 				for (i = 0; i < 4; i++) {
+					unsigned char tmp, tmp2;
+					struct ddvd_color colnew;
 					tmp = ((hl.palette) >> (16 + 4 * i)) & 0xf;
 					tmp2 = ((hl.palette) >> (4 * i)) & 0xf;
 					colnew.blue = ddvd_bl[i + 252] = ddvd_bl[tmp];
