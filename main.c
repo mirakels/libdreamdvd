@@ -2525,6 +2525,8 @@ static struct ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig)
 	struct ddvd_time info;
 	uint32_t pos, len;
 
+	playerconfig->next_time_update = ddvd_get_time() + 1000;
+
 	info.pos_minutes = info.pos_hours = info.pos_seconds = info.pos_chapter = info.pos_title = 0;
 	info.end_minutes = info.end_hours = info.end_seconds = info.end_chapter = 0;
 
@@ -2549,8 +2551,6 @@ static struct ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig)
 
 		info.pos_title = titleNo;
 	}
-
-	playerconfig->next_time_update = ddvd_get_time() + 1000;
 
 	return info;
 }
