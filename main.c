@@ -928,6 +928,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	 * and handles the returned events */
 	int reached_eof = 0;
 	int reached_sof = 0;
+	uint64_t now;
 
 	while (!finished) {
 		pci_t *pci = 0;
@@ -936,10 +937,11 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		int draw_osd = 0;
 
 		/* the main reading function */
+		now = ddvd_get_time();
 		if (ddvd_playmode == PLAY) {	//skip when not in play mode
 			// trickmode
 			if (ddvd_trickmode != TOFF) {
-				if (ddvd_trick_timer_end <= ddvd_get_time()) {
+				if (now >= ddvd_trick_timer_end) {
 					if (ddvd_trickmode == FASTBW) {	//jump back ?
 						uint32_t pos, len;
 						dvdnav_get_position(dvdnav, &pos, &len);
@@ -969,7 +971,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 							msg = DDVD_SHOWOSD_STATE_FFWD;
 						dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
 					}
-					ddvd_trick_timer_end = ddvd_get_time() + 300;
+					ddvd_trick_timer_end = now + 300;
 					ddvd_lpcm_count = 0;
 					ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 				}
@@ -1026,7 +1028,7 @@ send_message:
 				reached_sof = 0;
 			}
 
-			if (ddvd_get_time() > playerconfig->next_time_update) {
+			if (now >= playerconfig->next_time_update) {
 				msg = DDVD_SHOWOSD_TIME;
 				goto send_message;
 			}
@@ -1068,7 +1070,7 @@ send_message:
 			}
 			// wait timer
 			if (ddvd_wait_timer_active) {
-				if (ddvd_wait_timer_end <= ddvd_get_time()) {
+				if (now >= ddvd_wait_timer_end) {
 					ddvd_wait_timer_active = 0;
 					dvdnav_still_skip(dvdnav);
 					//Debug(1, "wait timer done\n");
@@ -1076,7 +1078,7 @@ send_message:
 			}
 			// SPU timer
 			if (ddvd_spu_timer_active) {
-				if (ddvd_spu_timer_end <= ddvd_get_time()) {
+				if (now >= ddvd_spu_timer_end) {
 					ddvd_spu_timer_active = 0;
 						/* the last_spu bbox is still filled with the correct value, no need to blit full screen */
 						/* TODO: only clear part of backbuffer */
@@ -1505,7 +1507,7 @@ send_message:
 				if (still_event->length < 0xff) {
 					if (!ddvd_wait_timer_active) {
 						ddvd_wait_timer_active = 1;
-						ddvd_wait_timer_end = ddvd_get_time() + still_event->length * 1000;	//ms
+						ddvd_wait_timer_end = now + still_event->length * 1000;	//ms
 					}
 				}
 				else
@@ -1870,7 +1872,7 @@ send_message:
 				// set timer
 				if (cur_spu_return.display_time > 0) {
 					ddvd_spu_timer_active = 1;
-					ddvd_spu_timer_end = ddvd_get_time() + cur_spu_return.display_time * 10;	//ms
+					ddvd_spu_timer_end = now + cur_spu_return.display_time * 10;	//ms
 				}
 				else
 					ddvd_spu_timer_active = 0;
