@@ -943,25 +943,34 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 			if ((ddvd_trickmode == FASTFW || ddvd_trickmode == FASTBW) && now >= ddvd_trick_timer_end) {
 				uint32_t pos, len;
 				dvdnav_get_position(dvdnav, &pos, &len);
-				// 90000 = 1 Sek. -> 45000 = 0.5 Sek. -> Speed Faktor=2
-				// 90000 = 1 Sek. -> 22500 = 0.25 Sek. -> Speed Faktor=2
-				int64_t posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (int64_t)(vpts > pts ? pts - vpts : 0) +
-								(ddvd_trickmode == FASTBW ? -45000 : 22500) * 2 * ddvd_trickspeed;
-				int64_t posnew2 = (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
-				if (posnew2 <= 0) {	// reached begin of movie
-					posnew2 = 0;
+				if (!len)
+					len = 1;
+				// Backward: 90000 = 1 Sek. -> 45000 = 0.5 Sek. -> Speed Faktor=2
+				// Forward:  90000 = 1 Sek. -> 22500 = 0.25 Sek. -> Speed Faktor=2
+				#define FORWARD_WAIT 300
+				#define BACKWARD_WAIT 500
+				int64_t offset;
+				if (ddvd_trickmode & TRICKBW)
+					offset = -(ddvd_trickspeed + 1) * 90000L * BACKWARD_WAIT/1000;
+				else
+					offset = (ddvd_trickspeed - 1) * 90000L * FORWARD_WAIT/1000;
+				int64_t newpos = (int64_t)pos +(offset + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
+				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - clr spu frame spu_nr=%d->%d vpts=%llu pts=%llu\n", now, pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
+
+				if (newpos <= 0) {	// reached begin of movie
+					newpos = 0;
 					reached_sof = 1;
 					msg = DDVD_SHOWOSD_TIME;
 				}
-				else if (posnew2 >= len) {	// reached end of movie
-					posnew2 = len - 250;
+				else if (newpos >= len) {	// reached end of movie
+					newpos = len - 250;
 					reached_eof = 1;
 					msg = DDVD_SHOWOSD_TIME;
 				}
 				else
 					msg = ddvd_trickmode == FASTFW ? DDVD_SHOWOSD_STATE_FFWD : DDVD_SHOWOSD_STATE_FBWD;
-				dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
-				ddvd_trick_timer_end = now + 300;
+				dvdnav_sector_search(dvdnav, newpos, SEEK_SET);
+				ddvd_trick_timer_end = now + (ddvd_trickmode == FASTFW ? FORWARD_WAIT : BACKWARD_WAIT);
 				ddvd_lpcm_count = 0;
 				ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 			}
@@ -2312,15 +2321,17 @@ key_play:
 							// 90000 = 1 Sek.
 							if (!len)
 								len = 1;
-							long long int posnew = ((pos * ddvd_lastCellEventInfo.pgc_length) / len) + (90000L * skip) +
-                                                   (int64_t)(vpts > pts ? pts - vpts : 0);
-							long long int posnew2 = posnew <= 0 ? 0 : (posnew * len) / ddvd_lastCellEventInfo.pgc_length;
-							Debug(1, "DDVD_SKIP skip=%d pos=%u len=%u posnew1=%lld posnew2=%lld\n", skip, pos, len, posnew, posnew2);
-							if (posnew2 >= len) {	// reached end of movie
-								posnew2 = len - 250;
+							int64_t newpos = pos + (skip * 90000L + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
+							Debug(1, "DDVD_SKIP skip=%d oldpos=%u len=%u pgc=%lld newpos=%lld vpts=%llu pts=%llu\n", skip, pos, len, ddvd_lastCellEventInfo.pgc_length, newpos, vpts, pts);
+							if (newpos >= len) {	// reached end of movie
+								newpos = len - 250;
 								reached_eof = 1;
 							}
-							dvdnav_sector_search(dvdnav, posnew2, SEEK_SET);
+							else if (newpos < 0) {
+								newpos = 0;
+								reached_sof = 1;
+							}
+							dvdnav_sector_search(dvdnav, newpos, SEEK_SET);
 							ddvd_lpcm_count = 0;
 							msg = DDVD_SHOWOSD_TIME;
 							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
