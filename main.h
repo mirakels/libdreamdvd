@@ -157,7 +157,16 @@ int ddvd_spu_backptr,ddvd_spu_backnr;
 int ddvd_lbb_changed;
 int ddvd_clear_screen;
 
-enum {TOFF, SLOWFW, FASTFW, SLOWBW, FASTBW};
+enum {
+	TOFF    = 0x00,
+	FASTFW  = 0x01,
+	FASTBW  = 0x02,
+	TRICKFW = 0x04,
+	TRICKBW = 0x08,
+    SLOWFW  = 0x10
+    SLOWBW  = 0x20
+};
+
 int ddvd_trickmode,ddvd_trickspeed;
 
 enum {STOP, PLAY, PAUSE};

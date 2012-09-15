@@ -940,7 +940,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		now = ddvd_get_time();
 		if (ddvd_playmode == PLAY) {	//skip when not in play mode
 			// trickmode
-			if ((ddvd_trickmode == FASTFW || ddvd_trickmode == FASTBW) && now >= ddvd_trick_timer_end) {
+			if (ddvd_trickmode & (TRICKFW | TRICKBW) && now >= ddvd_trick_timer_end) {
 				uint32_t pos, len;
 				dvdnav_get_position(dvdnav, &pos, &len);
 				if (!len)
@@ -968,9 +968,9 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 					msg = DDVD_SHOWOSD_TIME;
 				}
 				else
-					msg = ddvd_trickmode == FASTFW ? DDVD_SHOWOSD_STATE_FFWD : DDVD_SHOWOSD_STATE_FBWD;
+					msg = ddvd_trickmode & TRICKFW ? DDVD_SHOWOSD_STATE_FFWD : DDVD_SHOWOSD_STATE_FBWD;
 				dvdnav_sector_search(dvdnav, newpos, SEEK_SET);
-				ddvd_trick_timer_end = now + (ddvd_trickmode == FASTFW ? FORWARD_WAIT : BACKWARD_WAIT);
+				ddvd_trick_timer_end = now + (ddvd_trickmode & TRICKFW ? FORWARD_WAIT : BACKWARD_WAIT);
 				ddvd_lpcm_count = 0;
 				ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 			}
@@ -2253,11 +2253,13 @@ key_play:
 #if CONFIG_API_VERSION == 1
 							ddvd_device_clear();
 #endif
+							if (ddvd_trickmode & (FASTFW|FASTBW))
+								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
+									perror("LIBDVD: VIDEO_FAST_FORWARD");
 							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 									perror("LIBDVD: AUDIO_SET_MUTE");
-							ddvd_trickmode = TOFF;
-							if (ddvd_playmode == PLAY) {
+							if (ddvd_playmode == PLAY || ddvd_trickmode & FASTFW) {
 								if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
 									perror("LIBDVD: AUDIO_CONTINUE");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
@@ -2265,6 +2267,7 @@ key_play:
 								msg = DDVD_SHOWOSD_STATE_PLAY;
 								safe_write(message_pipe, &msg, sizeof(int));
 							}
+							ddvd_trickmode = TOFF;
 							msg = DDVD_SHOWOSD_TIME;
 						}
 						break;
@@ -2297,9 +2300,9 @@ key_play:
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
 								perror("LIBDVD: AUDIO_SET_MUTE");
 							ddvd_trickspeed = 2;
-							ddvd_trickmode = (rccode == DDVD_KEY_FBWD ? FASTBW : FASTFW);
+							ddvd_trickmode = (rccode == DDVD_KEY_FBWD ? TRICKBW : FASTFW);
 						}
-						else if (ddvd_trickmode == (rccode == DDVD_KEY_FBWD ? FASTFW : FASTBW)) {
+						else if (ddvd_trickmode & (rccode == DDVD_KEY_FBWD ? (TRICKFW|FASTFW) : TRICKBW)) {
 							ddvd_trickspeed /= 2;
 							if (ddvd_trickspeed == 1) {
 								ddvd_trickspeed = 0;
@@ -2308,6 +2311,26 @@ key_play:
 						}
 						else if (ddvd_trickspeed < 64)
 							ddvd_trickspeed *= 2;
+
+						if (ddvd_trickmode & (TRICKFW|FASTFW)) {
+							if (ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
+								ddvd_trickmode = FASTFW; // Driver fast forward
+								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, ddvd_trickspeed) < 0)
+									perror("LIBDVD: VIDEO_FAST_FORWARD");
+								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+									perror("LIBDVD: VIDEO_CONTINUE");
+							}
+							else {
+								if (ddvd_trickmode & FASTFW) {
+									if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0) < 0)
+										perror("LIBDVD: VIDEO_FAST_FORWARD");
+									if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+										perror("LIBDVD: VIDEO_CONTINUE");
+								}
+								ddvd_trickmode = TRICKFW; // Trick fast forward
+							}
+						}
+						msg = ddvd_trickmode & (TRICKBW|FASTBW) ? DDVD_SHOWOSD_STATE_FBWD : DDVD_SHOWOSD_STATE_FFWD;
 						break;
 					}
 					case DDVD_SKIP_FWD:
