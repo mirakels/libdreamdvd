@@ -1569,6 +1569,7 @@ send_message:
 				if (spu_lock)
 					break;
 
+				int old_active_id = spu_active_id;
 				dvdnav_spu_stream_change_event_t *ev = (dvdnav_spu_stream_change_event_t *) buf;
 				switch (tv_scale) {
 					case 0:	//off
@@ -1587,26 +1588,27 @@ send_message:
 				uint16_t spu_lang = 0xFFFF;
 				int spu_id_logical, count_tmp;
 				spu_id_logical = -1;
-				count_tmp = spu_active_id;
-				while (count_tmp >= 0 && count_tmp < MAX_SPU) {
+				for (count_tmp = spu_active_id; count_tmp >= 0; count_tmp--) {
 					spu_id_logical = playerconfig->spu_map[count_tmp];
 					if (spu_id_logical >= 0)
-						count_tmp = 0;
-					count_tmp--;
+						break;
 				}
-				ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 
 				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 				if (spu_lang == 0xFFFF) {
 					spu_lang = 0x2D2D;	// SPU "off, unknown or maybe menuoverlays"
 					spu_id_logical = -1;
 				}
+				if (old_active_id != spu_active_id) {
+					Debug(3, "   clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
+					ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
+				}
 				msg = DDVD_SHOWOSD_SUBTITLE;
 				int report_spu = spu_id_logical > 31 ? -1 : spu_id_logical;
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &report_spu, sizeof(int));
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
-				//Debug(1, "SPU Stream change: w %X l: %X p: %X active: %X\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan, spu_active_id);
+				Debug(3, "SPU Stream change: w %d l: %d p: %d active: %d spu_lang=%04X\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan, spu_active_id, spu_lang);
 				break;
 
 			case DVDNAV_AUDIO_STREAM_CHANGE:
