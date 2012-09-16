@@ -2632,14 +2632,12 @@ static struct ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig)
 		uint64_t len_s = ddvd_lastCellEventInfo.pgc_length / 90000;
 		uint64_t pos_s = ((ddvd_lastCellEventInfo.pgc_length / len) * pos) / 90000;
 
-		info.pos_minutes = pos_s / 60;
-		info.pos_hours = info.pos_minutes / 60;
-		info.pos_minutes = info.pos_minutes - (info.pos_hours * 60);
-		info.pos_seconds = pos_s - ((info.pos_hours * 60) + info.pos_minutes) * 60;
-		info.end_minutes = len_s / 60;
-		info.end_hours = info.end_minutes / 60;
-		info.end_minutes = info.end_minutes - (info.end_hours * 60);
-		info.end_seconds = len_s - ((info.end_hours * 60) + info.end_minutes) * 60;
+		info.end_seconds = pos_s % 60;
+		info.end_minutes = (pos_s / 60) % 60;
+		info.end_hours = pos_s / 3600;
+		info.end_seconds = len_s % 60;
+		info.end_minutes = (len_s / 60) % 60;
+		info.end_hours = len_s / 3600;
 
 		info.pos_title = titleNo;
 	}
