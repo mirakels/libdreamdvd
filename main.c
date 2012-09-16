@@ -1033,7 +1033,9 @@ send_message:
 				reached_sof = 0;
 			}
 
+			now = ddvd_get_time();
 			if (now >= playerconfig->next_time_update) {
+				playerconfig->next_time_update = now + 1000;
 				msg = DDVD_SHOWOSD_TIME;
 				goto send_message;
 			}
@@ -2616,8 +2618,6 @@ static struct ddvd_time ddvd_get_osd_time(struct ddvd *playerconfig)
 	int titleNo;
 	struct ddvd_time info;
 	uint32_t pos, len;
-
-	playerconfig->next_time_update = ddvd_get_time() + 1000;
 
 	info.pos_minutes = info.pos_hours = info.pos_seconds = info.pos_chapter = info.pos_title = 0;
 	info.end_minutes = info.end_hours = info.end_seconds = info.end_chapter = 0;
