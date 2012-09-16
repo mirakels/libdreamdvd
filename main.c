@@ -31,7 +31,7 @@
 
 #define Debug(level, str, ...) (DebugLevel > level ? printf("LIBDVD: %07.3f: " str, (float) ddvd_get_time() / 1000.0, ##__VA_ARGS__) : 0)
 
-int DebugLevel = 3;
+int DebugLevel = 1;
 
 /*
  * local helper functions
@@ -581,6 +581,11 @@ static int readApiFrameRate(int fd, int *framerate)
 // the main player loop
 enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 {
+	{	char * DL = getenv("LIBDVD_DEBUG");
+		if (DL)
+			DebugLevel = atoi(DL);
+	}
+
 	if (playerconfig->lfb == NULL) {
 		Debug(1, "Frame/backbuffer not given to libdreamdvd. Will not start the player !\n");
 		return DDVD_INVAL;
@@ -955,7 +960,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 				else
 					offset = (ddvd_trickspeed - 1) * 90000L * FORWARD_WAIT/1000;
 				int64_t newpos = (int64_t)pos +(offset + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
-				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - clr spu frame spu_nr=%d->%d vpts=%llu pts=%llu\n", now, pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
+				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - vpts=%llu pts=%llu\n", now, pos, newpos, offset, vpts, pts);
 
 				if (newpos <= 0) {	// reached begin of movie
 					newpos = 0;
@@ -1015,12 +1020,14 @@ send_message:
 			}
 
 			if (reached_eof) {
+				Debug(2, "EOF\n");
 				msg = DDVD_EOF_REACHED;
 				safe_write(message_pipe, &msg, sizeof(int));
 				reached_eof = 0;
 			}
 
 			if (reached_sof) {
+				Debug(2, "SOF\n");
 				msg = DDVD_SOF_REACHED;
 				safe_write(message_pipe, &msg, sizeof(int));
 				reached_sof = 0;
@@ -1080,6 +1087,7 @@ send_message:
 					ddvd_spu_timer_active = 0;
 						/* the last_spu bbox is still filled with the correct value, no need to blit full screen */
 						/* TODO: only clear part of backbuffer */
+					Debug(3, "    set clear SPU backbuffer, SPU finished\n");
 					ddvd_clear_screen = 1;
 				}
 			}
@@ -1451,6 +1459,7 @@ send_message:
 						}
 					}
 					else if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xE0) == 0x20 && ((buf[14 + buf[14 + 8] + 9]) & 0x1F) == spu_active_id) {	// SPU packet
+						Debug(2, "SPU BLOCK: spu_nr=%d/%d vpts=%llu pts=%llu highlight=%d\n", ddvd_spu_play, ddvd_spu_ind, vpts, pts, have_highlight);
 						if (buf[14 + 7] & 128) {
 							/* damn gcc bug */
 							spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
@@ -1461,7 +1470,8 @@ send_message:
 #if CONFIG_API_VERSION == 1
 							spts >>= 1;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
 #endif
-							//Debug(1, "SPTS=%llu\n",(int)spts);
+							int f = spts/90000;
+							Debug(2, "                                                                 SPTS=%llu  %3d:  %d:%02d:%02d.05d\n", spts, ddvd_spu_ind, f/3600, (f%3600)/60, f%60, (spts%90000)*10/9);
 						}
 
 						int i = ddvd_spu_ind % NUM_SPU_BACKBUFFER;
@@ -1510,6 +1520,7 @@ send_message:
 				}
 				else
 					ddvd_wait_for_user = 1;
+				Debug(2, "DVDNAV_STILL_FRAME: lenght=%d pts=%llu\n", still_event->length, pts);
 				break;
 
 			case DVDNAV_WAIT:
@@ -1521,6 +1532,7 @@ send_message:
 			case DVDNAV_SPU_CLUT_CHANGE:
 				/* We received a new color lookup table so we read and store it */
 				{
+					Debug(2, "DVDNAV_SPU_CLUT_CHANGE vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 					int i = 0, i2 = 0;
 					uint8_t pal[16 * 4];
 #if BYTE_ORDER == BIG_ENDIAN
@@ -1565,6 +1577,7 @@ send_message:
 				break;
 
 			case DVDNAV_SPU_STREAM_CHANGE:
+				Debug(2, "DVDNAV_SPU_STREAM_CHANGE vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 				/* We received a new SPU stream ID */
 				if (spu_lock)
 					break;
@@ -1621,10 +1634,12 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Prepare to display some Buttons */
+				Debug(2, "DVDNAV_HIGHLIGHT clear=%d vpts=%llu pts=%llu\n", ddvd_clear_buttons, vpts, pts);
 				{
 					dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
 					if (!ddvd_clear_buttons && highlight_event.buttonN != hl->buttonN ||
 						highlight_event.pts != hl->pts) {
+						Debug(2, "HIGHLIGHT RECEIVED  button=%d mode=%d, bpts=%u\n", hl->buttonN, hl->display, hl->pts);
 						memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
 						have_highlight = 1;
 					}
@@ -1634,6 +1649,7 @@ send_message:
 
 			case DVDNAV_VTS_CHANGE:
 				{
+					Debug(2, "DVDNAV_VTS_CHANGE vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 					/* Some status information like video aspect and video scale permissions do
 					 * not change inside a VTS. Therefore we will set it new at this place */
 					ddvd_play_empty(FALSE);
@@ -1647,14 +1663,16 @@ send_message:
 						playerconfig->spu_map[count_tmp] = -1;
 					for (count_tmp = 0; count_tmp < MAX_SPU; count_tmp++) {
 						spu_tmp = dvdnav_get_spu_logical_stream(dvdnav, count_tmp);
-						if (spu_tmp >= 0 && spu_tmp < MAX_SPU)
+						if (spu_tmp >= 0 && spu_tmp < MAX_SPU) {
 							playerconfig->spu_map[spu_tmp] = count_tmp;
+							Debug(2, "    spu %d -> logical stream %d\n", spu_tmp, count_tmp);
+						}
 					}
 
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
 					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect, tv_mode);
-					//Debug(1, "Aspect: %d TV Aspect: %d Scale: %d Allowed: %d\n", dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm);
+					Debug(3, "    DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d TV mode: %d\n", dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode);
 
 					// resuming a dvd ?
 					if (playerconfig->should_resume && first_vts_change) {
@@ -1684,6 +1702,7 @@ send_message:
 
 			case DVDNAV_CELL_CHANGE:
 				{
+					Debug(2, "DVDNAV_CELL_CHANGE vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 					/* Store new cell information */
 					memcpy(&ddvd_lastCellEventInfo, buf, sizeof(dvdnav_cell_change_event_t));
 
@@ -1747,6 +1766,7 @@ send_message:
 			case DVDNAV_NAV_PACKET:
 				/* A NAV packet provides PTS discontinuity information, angle linking information and
 				 * button definitions for DVD menus. We have to handle some stilframes here */
+				// Debug(3, "DVDNAV_NAV_PACKJET vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 				if ((ddvd_still_frame & NAV_STILL) && ddvd_iframesend == 0 && ddvd_last_iframe_len)
 					ddvd_iframesend = 1;
 
@@ -1760,12 +1780,13 @@ send_message:
 			case DVDNAV_HOP_CHANNEL:
 				/* This event is issued whenever a non-seamless operation has been executed.
 				 * So we drop our buffers */
+				Debug(2, "DVDNAV_HOP_CHANNEL vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 				ddvd_play_empty(TRUE);
 				break;
 
 			case DVDNAV_STOP:
 				/* Playback should end here. */
-				Debug(1, "DVDNAV_STOP\n");
+				Debug(2, "DVDNAV_STOP\n");
 				playerconfig->resume_title = 0;
 				playerconfig->resume_chapter = 0;
 				playerconfig->resume_block = 0;
@@ -1811,6 +1832,7 @@ send_message:
 					evt.aspect = event.u.size.aspect_ratio;
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &evt, sizeof(evt));
+					Debug(3, "video size: %dx%d@%d\n", evt.width, evt.height, evt.aspect);
 					break;
 				}
 				case VIDEO_EVENT_FRAME_RATE_CHANGED:
@@ -1820,6 +1842,7 @@ send_message:
 					evt.framerate = event.u.frame_rate;
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &evt, sizeof(evt));
+					Debug(3, "framerate: %d\n", evt.framerate);
 					break;
 				}
 				case 16: // VIDEO_EVENT_PROGRESSIVE_CHANGED
@@ -1829,6 +1852,7 @@ send_message:
 					evt.progressive = event.u.frame_rate;
 					safe_write(message_pipe, &msg, sizeof(int));
 					safe_write(message_pipe, &evt, sizeof(evt));
+					Debug(3, "progressive: %d\n", evt.progressive);
 					break;
 				}
 			}
@@ -1836,17 +1860,15 @@ send_message:
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
 			perror("LIBDVD: VIDEO_GET_PTS");
 		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
-//		Debug(1, "pts %d, spu = %d/%d, spu_backpts = %d\n", (int)pts, (int)ddvd_spu_play, (int)ddvd_spu_ind, (int) spupts);
 		if (ddvd_spu_play < ddvd_spu_ind && (pts >= spupts || in_menu)) {
 #endif
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
 			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts); // decode
+			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %d %d %d %d\n",
+				ddvd_spu_play, pts, spupts,
+				cur_spu_return.x_start, cur_spu_return.x_end,
+				cur_spu_return.y_start, cur_spu_return.y_end);
 			ddvd_spu_play++;
-
-//			Debug(1, "SPU current=%d spupts=%llu bbox: %d %d %d %d\n",
-//				ddvd_spu_play, spupts,
-//				cur_spu_return.x_start, cur_spu_return.x_end,
-//				cur_spu_return.y_start, cur_spu_return.y_end);
 
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				// highlight/button
@@ -1858,13 +1880,17 @@ send_message:
 					buttonN = pci->hli.hl_gi.btn_ns;
 				dvdnav_button_select(dvdnav, pci, buttonN);
 				have_highlight = 1;
+				Debug(2, "update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
+				Debug(2, "switching to menu\n");
 			}
 			else {
 				// subtitle
 				// we dont support overlapping spu timers yet,
 				// so we have to clear the screen if there is such a case
-				if (ddvd_spu_timer_active || last_spu_return.display_time < 0)
+				if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
 					ddvd_clear_screen = 1;
+					Debug(3, "clear p_lfb, physical screen, new SPU, vpts=%llu, pts=%llu spts=%llu highlight=%d, spu_timer_active=%d, sputime=%d\n", vpts, pts, spupts, have_highlight, ddvd_spu_timer_active, last_spu_return.display_time);
+				}
 
 				ddvd_lbb_changed = 1;
 				// set timer
@@ -1889,6 +1915,7 @@ send_message:
 
 		// subtitle handling
 		if (ddvd_lbb_changed == 1) {
+			Debug(3, "    drawing subtitle, vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
 			if (ddvd_screeninfo_bypp == 1) {
 				struct ddvd_color colnew;
 				int ctmp;
@@ -1935,6 +1962,7 @@ send_message:
 		// highlight/button handling
 		if (have_highlight) {
 			have_highlight = 0;
+			Debug(3, "HIGHLIGHT DRAW Selected button=%d mode=%d, bpts=%u vpts=%llu pts=%llu\n", highlight_event.buttonN, highlight_event.display, highlight_event.pts, vpts, pts);
 
 			ddvd_clear_screen = 1;
 
@@ -1943,6 +1971,7 @@ send_message:
 			int libdvdnav_workaround = 0;
 
 			if (pci->hli.hl_gi.btngr_ns) {
+				Debug(3, "DOBUTTON %d data from buttongroup\n", highlight_event.buttonN);
 				int btns_per_group = 36 / pci->hli.hl_gi.btngr_ns;
 				btni_t *btni = NULL;
 				int modeMask = 1 << tv_scale;
@@ -1964,10 +1993,12 @@ send_message:
 				}
 			}
 			if (!libdvdnav_workaround && dvdnav_get_highlight_area(pci, highlight_event.buttonN, 0, &hl) == DVDNAV_STATUS_OK) {
+				Debug(3, "DOBUTTON %d data from highlight area\n", highlight_event.buttonN);
 				libdvdnav_workaround = 1;
 			}
 
 			if (libdvdnav_workaround) {
+				Debug(3, "DOBUTTON btni\n");
 				// get and set clut for actual button
 				int i;
 				if (ddvd_screeninfo_bypp == 1) {
@@ -1993,14 +2024,15 @@ send_message:
 				msg = DDVD_NULL;
 
 				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer ..
+				Debug(4, "        clear ddvd_lbb2, backbuffer, new button to come\n");
 				//copy button into screen
 				for (i = hl.sy; i < hl.ey; i++) {
 					if (ddvd_screeninfo_bypp == 1)
-						memcpy(ddvd_lbb2 + hl.sx + 720 * (i),
-								ddvd_lbb + hl.sx + 720 * (i), hl.ex - hl.sx);
+						memcpy(ddvd_lbb2 + hl.sx + 720 * i,
+								ddvd_lbb + hl.sx + 720 * i, hl.ex - hl.sx);
 					else
-						ddvd_blit_to_argb(ddvd_lbb2 + hl.sx * ddvd_screeninfo_bypp + 720 * ddvd_screeninfo_bypp * i,
-											ddvd_lbb + hl.sx + 720 * (i), hl.ex - hl.sx);
+						ddvd_blit_to_argb(ddvd_lbb2 + (hl.sx +720 * i) * ddvd_screeninfo_bypp,
+											ddvd_lbb + hl.sx + 720 * i, hl.ex - hl.sx);
 				}
 				blit_area.x_start = hl.sx;
 				blit_area.x_end = hl.ex;
@@ -2008,17 +2040,21 @@ send_message:
 				blit_area.y_end = hl.ey;
 				libdvdnav_workaround = 1;
 				draw_osd = 1;
+				Debug(3, "BUT new  bbox: %dx%d %dx%d\n",
+						blit_area.x_start, blit_area.y_start,
+						blit_area.x_end, blit_area.y_end);
+
 			}
 			else {
-				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear backbuffer ..
+				Debug(3, "DOBUTTON libdvdnav_workaround=0 - no drawing!\n");
 				draw_osd = 0;
 			}
 		}
 
 		if (ddvd_clear_screen) {
-			//Debug(1, "previous area to wipe: %d %d %d %d\n",
-			//			last_blit_area.x_start, last_blit_area.x_end,
-			//			last_blit_area.y_start, last_blit_area.y_end);
+			Debug(3, "DODRAW DRAW clear screen area: %dx%d %dx%d\n",
+					last_blit_area.x_start, last_blit_area.y_start,
+					last_blit_area.x_end, last_blit_area.y_end);
 			memset(p_lfb, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);	//clear screen ..
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
@@ -2026,6 +2062,7 @@ send_message:
 			ddvd_clear_screen = 0;
 		}
 		if (draw_osd) {
+			Debug(3, "DODRAW DRAW button/subtitle at: %dx%d %dx%d\n", blit_area.x_start, blit_area.y_start, blit_area.x_end, blit_area.y_end);
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
 			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
@@ -2036,13 +2073,14 @@ send_message:
 			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres ||
 				ddvd_screeninfo_xres != 720) && !playerconfig->canscale) {
 				// decide which resize routine we should use
-				// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
-				// for hd skins we use nearest neighbor resize because upscaling to hd is too slow with bicubic resize
-//				Debug(1, "resizing\n");
+				// on 4bpp mode we use bicubic resize for sd skins because we get much better results
+				// with subtitles and the speed is ok for hd skins we use nearest neighbor resize
+				// because upscaling to hd is too slow with bicubic resize
 				resized = 1;
 				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres,
 												x_offset, y_offset, blit_area.x_start, blit_area.x_end,
 												blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+				Debug(4, "resized to: %dx%d %dx%d\n", blit_area.x_start, blit_area.y_start, blit_area.x_end, blit_area.y_end);
 			}
 
 			if (resized) {
@@ -2058,6 +2096,7 @@ send_message:
 				blit_area.height = ddvd_screeninfo_yres;
 			}
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
+			Debug(4, "fill p_lfb from ddvd_lbb2, backbuffer with new button/subtitle\n");
 			//Debug(1, "needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
 			//Debug(1, "destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 			int msg_old = msg;	// save and restore msg it may not be empty
@@ -2075,11 +2114,13 @@ send_message:
 			int bla = DDVD_MENU_OPENED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 1;
+			Debug(3, "MENU_OPENED vpts=%llu, pts=%llu highlight=%d!!!\n", vpts, pts, have_highlight);
 		}
 		else if (playerconfig->in_menu && !(dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav))) {
 			int bla = DDVD_MENU_CLOSED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 0;
+			Debug(3, "MENU_CLOSED vpts=%llu, pts=%llu highlight=%d!!!\n", vpts, pts, have_highlight);
 		}
 
 		// report audio info
@@ -2104,6 +2145,7 @@ send_message:
 
 		//Userinput
 		if (ddvd_wait_for_user) {
+			Debug(3, "Waiting for keypress - %spaused\n", ddvd_playmode == PAUSE ? "" : "not ");
 			struct pollfd pfd[1];	// make new pollfd array
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
@@ -2128,6 +2170,24 @@ send_message:
 					keydone = 0;
 					break;
 			}
+			if (ddvd_playmode == PAUSE) {
+				switch (rccode) {       //Actions in PAUZE mode. Only play, pause and exit have visible effects...
+					case DDVD_KEY_PLAY:
+					case DDVD_KEY_PAUSE:
+					case DDVD_KEY_EXIT:
+					case DDVD_KEY_OK:
+						break;
+					case DDVD_SKIP_FWD:
+					case DDVD_SKIP_BWD:
+					case DDVD_SET_TITLE:
+					case DDVD_SET_CHAPTER:
+						// we must empty the pipe here... and fall through
+						ddvd_readpipe(key_pipe, &keydone, sizeof(int), 1);
+					default:
+						keydone = 1;
+						break;
+				}
+			}
 
 			if (!keydone && playerconfig->in_menu) {
 				switch (rccode) {	//Actions inside a Menu
@@ -2144,6 +2204,7 @@ send_message:
 						dvdnav_right_button_select(dvdnav, pci);
 						break;
 					case DDVD_KEY_OK:	//OK
+						Debug(3, "'OK' clear screen, clear buttons\n");
 						ddvd_wait_for_user = 0;
 						ddvd_play_empty(TRUE);
 						ddvd_clear_buttons = 1;
@@ -2152,7 +2213,7 @@ send_message:
 						dvdnav_button_activate(dvdnav, pci);
 						break;
 					case DDVD_KEY_EXIT:	//Exit
-						Debug(1, "DDVD_KEY_EXIT (menu)\n");
+						Debug(3, "DDVD_KEY_EXIT (menu)\n");
 						playerconfig->resume_title = 0;
 						playerconfig->resume_chapter = 0;
 						playerconfig->resume_block = 0;
@@ -2228,6 +2289,7 @@ send_message:
 					}
 					case DDVD_KEY_PAUSE:	// Pause
 					{
+						Debug(3, "DDVD_KEY_PAUSE (or pause fallthrough)\n");
 						if (ddvd_playmode == PLAY) {
 							ddvd_playmode = PAUSE;
 							if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
@@ -2245,6 +2307,7 @@ send_message:
 					}
 					case DDVD_KEY_PLAY:	// Play
 					{
+						Debug(3, "DDVD_KEY_PLAY (or pause fallthrough)\n");
 						if (ddvd_playmode == PAUSE || ddvd_trickmode != TOFF) {
 							if (ddvd_playmode == PAUSE)
 								ddvd_wait_for_user = 0;
@@ -2312,6 +2375,7 @@ key_play:
 						else if (ddvd_trickspeed < 64)
 							ddvd_trickspeed *= 2;
 
+						Debug(3, "%s speed %dx\n", ddvd_trickmode & (TRICKFW|FASTFW) ? "forward" : "backward", ddvd_trickspeed);
 						if (ddvd_trickmode & (TRICKFW|FASTFW)) {
 							if (ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
 								ddvd_trickmode = FASTFW; // Driver fast forward
@@ -2345,7 +2409,7 @@ key_play:
 							if (!len)
 								len = 1;
 							int64_t newpos = pos + (skip * 90000L + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
-							Debug(1, "DDVD_SKIP skip=%d oldpos=%u len=%u pgc=%lld newpos=%lld vpts=%llu pts=%llu\n", skip, pos, len, ddvd_lastCellEventInfo.pgc_length, newpos, vpts, pts);
+							Debug(3, "DDVD_SKIP skip=%d oldpos=%u len=%u pgc=%lld newpos=%lld vpts=%llu pts=%llu\n", skip, pos, len, ddvd_lastCellEventInfo.pgc_length, newpos, vpts, pts);
 							if (newpos >= len) {	// reached end of movie
 								newpos = len - 250;
 								reached_eof = 1;
@@ -2533,7 +2597,7 @@ static int ddvd_readpipe(int pipefd, void *dest, size_t bytes, int blocked_read)
 				}
 				break;	// leave while loop
 			}
-			/* else if (errno == ????) // hier sollte evtl noch geschaut werden welcher error code kommt wenn die pipe geschlossen wurde...
+			/* else if (errno == ????) // FIXME: determine error when pipe closes...
 			   break; */
 			Debug(1, "unhandled read error %d(%m)\n", errno);
 		}
@@ -2618,6 +2682,7 @@ static uint64_t ddvd_get_time(void)
 // Empty all Buffers
 static void ddvd_play_empty(int device_clear)
 {
+	Debug(3, "ddvd_play_empty clear=%d\n", device_clear);
 	ddvd_wait_for_user = 0;
 	ddvd_clear_buttons = 0;
 	ddvd_lpcm_count = 0;
@@ -2672,7 +2737,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 	datasize = (buffer[2] << 8 | buffer[3]);
 	controlsize = (buffer[datasize + 2] << 8 | buffer[datasize + 3]);
 
-	//Debug(1, "SPU_dec: Size: %X Datasize: %X Controlsize: %X\n", size, datasize, controlsize);
+	Debug(4, "SPU_dec: Size: %X Datasize: %X Controlsize: %X\n", size, datasize, controlsize);
 	// parse header
 	int i = datasize + 4;
 
@@ -2680,20 +2745,23 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 		switch (buffer[i]) {
 			case 0x00:	/* force */
 				force_hide = SPU_FORCE;
+				Debug(4, "force\n");
 				i++;
 				break;
 			case 0x01:	/* show */
 				force_hide = SPU_SHOW;
+				Debug(4, "show\n");
 				i++;
 				break;
 			case 0x02:	/* hide */
 				force_hide = SPU_HIDE;
+				Debug(4, "hide\n");
 				i++;
 				break;
 			case 0x03:	/* palette */
 			{
 				ddvd_spudec_clut_t *clut = (ddvd_spudec_clut_t *) (buffer + i + 1);
-				//Debug(1, "update palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
+				Debug(4, "update palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
 
 				ddvd_bl[3 + 252] = ddvd_bl[clut->entry0];
 				ddvd_gn[3 + 252] = ddvd_gn[clut->entry0];
@@ -2717,7 +2785,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 			case 0x04:	/* transparency palette */
 			{
 				ddvd_spudec_clut_t *clut = (ddvd_spudec_clut_t *) (buffer + i + 1);
-				//Debug(1, "update transp palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
+				Debug(4, "update transp palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
 
 				ddvd_tr[0 + 252] = (0xF - clut->entry3) * 0x1111;
 				ddvd_tr[1 + 252] = (0xF - clut->entry2) * 0x1111;
@@ -2732,17 +2800,17 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 				yspu = y1spu = (((unsigned int)buffer[i + 4]) << 4) + (buffer[i + 5] >> 4);
 				x2spu = (((buffer[i + 2] & 0x0f) << 8) + buffer[i + 3]);
 				y2spu = (((buffer[i + 5] & 0x0f) << 8) + buffer[i + 6]);
-				//Debug(1, "image coords %d %d %d %d\n", xspu, yspu, x2spu, y2spu);
+				Debug(4, "image coords: %dx%d,%dx%d\n", xspu, yspu, x2spu, y2spu);
 				i += 7;
 				break;
 			case 0x06:	/* image 1 / image 2 offsets */
 				offset[0] = (((unsigned int)buffer[i + 1]) << 8) + buffer[i + 2];
 				offset[1] = (((unsigned int)buffer[i + 3]) << 8) + buffer[i + 4];
-				//Debug(1, "image offsets %d %d\n", offset[0], offset[1]);
+				Debug(4, "image offsets %x,%x\n", offset[0], offset[1]);
 				i += 5;
 				break;
 			case 0x07:	/* change color for a special area so overlays with more than 4 colors are possible - NOT IMPLEMENTET YET */
-				//Debug(1, "change color packet - not implemented\n");
+				Debug(4, "change color packet - not implemented\n");
 				param_len = (buffer[i + 1] << 8 | buffer[i + 2]);
 				i += param_len + 1;
 				break;
@@ -2756,7 +2824,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 	if (i + 6 <= size) {
 		if (buffer[i + 5] == 0x02 && buffer[i + 6] == 0xFF) {
 			display_time = ((buffer[i + 1] << 8) + buffer[i + 2]);
-			//Debug(1, "Display Time: %d\n", display_time);
+			Debug(4, "Display Time: %d\n", display_time);
 		}
 	}
 
