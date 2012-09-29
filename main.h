@@ -163,7 +163,7 @@ enum {
 	FASTBW  = 0x02,
 	TRICKFW = 0x04,
 	TRICKBW = 0x08,
-    SLOWFW  = 0x10
+    SLOWFW  = 0x10,
     SLOWBW  = 0x20
 };
 
