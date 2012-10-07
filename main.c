@@ -1603,14 +1603,12 @@ send_message:
 						break;
 				}
 				uint16_t spu_lang = 0xFFFF;
-				int spu_id_logical, count_tmp;
-				spu_id_logical = -1;
-				for (count_tmp = spu_active_id; count_tmp >= 0; count_tmp--) {
-					spu_id_logical = playerconfig->spu_map[count_tmp];
+				int spu_id_logical = -1, count_tmp = spu_active_id;
+				while (count_tmp >= 0) {  // when spu_active_id == -1 the loop is skipped
+					spu_id_logical = playerconfig->spu_map[count_tmp--];
 					if (spu_id_logical >= 0)
 						break;
 				}
-
 				spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 				if (spu_lang == 0xFFFF) {
 					spu_lang = 0x2D2D;	// SPU "off, unknown or maybe menuoverlays"
@@ -1732,13 +1730,11 @@ send_message:
 							spu_lock = 1;//playerconfig->resume_spu_lock;
 							report_audio_info = 1;
 							uint16_t spu_lang = 0xFFFF;
-							int spu_id_logical, count_tmp;
-							count_tmp = spu_active_id;
-							while (count_tmp >= 0) {
-								spu_id_logical = playerconfig->spu_map[count_tmp];
+							int spu_id_logical = -1, count_tmp = spu_active_id;
+							while (count_tmp >= 0) {  // when spu_active_id == -1 the loop is skipped
+								spu_id_logical = playerconfig->spu_map[count_tmp--];
 								if (spu_id_logical >= 0)
-									count_tmp = 0;
-								count_tmp--;
+									break;
 							}
 							spu_lang = dvdnav_spu_stream_to_lang(dvdnav, (spu_id_logical >= 0 ? spu_id_logical : spu_active_id) & 0x1F);
 							if (spu_lang == 0xFFFF) {
@@ -2465,14 +2461,12 @@ key_play:
 						int spu_id_logical;
 						int old_active_id = spu_active_id;
 						if (rccode == DDVD_KEY_SUBTITLE) {
-							int count_tmp;
 							spu_id_logical = -1;
-							count_tmp = spu_active_id;
-							while (count_tmp >= 0) {
-								spu_id_logical = playerconfig->spu_map[count_tmp];
+							int count_tmp = spu_active_id;
+							while (count_tmp >= 0) {  // when spu_active_id == -1 the loop is skipped
+								spu_id_logical = playerconfig->spu_map[count_tmp--];
 								if (spu_id_logical >= 0)
-									count_tmp = 0;
-								count_tmp--;
+									break;
 							}
 							spu_id_logical++;
 							spu_active_id = dvdnav_get_spu_logical_stream(dvdnav, spu_id_logical);
