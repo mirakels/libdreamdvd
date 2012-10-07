@@ -900,7 +900,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	for (i=0; i < MAX_SPU; i++)
 		playerconfig->spu_map[i] = -1;
 
-	unsigned long long vpts, apts, spts, pts;
+	unsigned long long vpts = 0, apts = 0, spts = 0, pts = 0;
 
 	audio_id = dvdnav_get_active_audio_stream(dvdnav);
 	ddvd_playmode = PLAY;
