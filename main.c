@@ -1812,17 +1812,16 @@ send_message:
 		in_menu = pci && pci->hli.hl_gi.btn_ns > 0;
 
 		// spu and highlight/button handling
+		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
 #if CONFIG_API_VERSION == 1
 		unsigned int tpts;
 		if (ioctl(ddvd_output_fd, VIDEO_GET_PTS, &tpts) < 0)
 			perror("LIBDVD: VIDEO_GET_PTS");
 		pts = (unsigned long long)tpts;
-		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
 		// we only have a 32bit pts on vulcan/pallas (instead of 33bit) so we need some
 		// tolerance on syncing SPU for menus so on non animated menus the buttons will
 		// be displayed to soon, but we we have to accept it
-		signed long long diff = spupts - pts;
-		if (ddvd_spu_play < ddvd_spu_ind && (diff <= 0xFF || in_menu)) {
+		signed long long spudiff = pts - spupts + 255;
 #else
 		struct video_event event;
 		if (!ioctl(ddvd_fdvideo, VIDEO_GET_EVENT, &event)) {
@@ -1863,9 +1862,18 @@ send_message:
 		}
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
 			perror("LIBDVD: VIDEO_GET_PTS");
-		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
-		if (ddvd_spu_play < ddvd_spu_ind && (pts >= spupts || in_menu)) {
+		// pts+10 to avoid decoder time rounding errors. Seen vpts=11555 and pts=11554 ...
+		signed long long spudiff = pts+10 - spupts;
 #endif
+		/*
+		 * When vpts > pts we are still in a normal stream so check on spudif is enough.
+		 * But when vpts < pts, libdvdnav already is working on a new video fragment possible sending out PSU.
+		 * In that case we should only display the SPU if the spupts is still from the previous video (spupts > vpts)
+		 * and the SPU is within 2 seconds of the pts (spudiff < 2*90000).
+		 * (FIXME: why do we need this last check?, maybe doing this last check is just enough...)
+		 * Or when vpts < pts check that the previous_spupts < spupts ...
+		 */
+		if (ddvd_spu_play < ddvd_spu_ind && spudiff >= 0 && (vpts > pts || spupts+5 > vpts && spudiff < 2*90000)) {
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
 			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts); // decode
 			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %d %d %d %d\n",
