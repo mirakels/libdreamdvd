@@ -217,6 +217,7 @@ void ddvd_set_dvd_path(struct ddvd *pconfig, const char *path)
 // set language
 void ddvd_set_language(struct ddvd *pconfig, const char lang[2])
 {
+	Debug(2, "ddvd_set_language to %c%c\n", lang[0], lang[1]);
 	memcpy(pconfig->language, lang, 2);
 }
 
@@ -426,6 +427,7 @@ void ddvd_get_audio_byid(struct ddvd *pconfig, int audio_id, void *lang, void *t
 		audio_lang = 0x2D2D;
 	memcpy(lang, &audio_lang, sizeof(uint16_t));
 	memcpy(type, &pconfig->audio_format[audio_id], sizeof(int));
+	Debug(2, "ddvd_get_audio_byid %d %c%c\n", audio_id, audio_lang >> 8, audio_lang & 0xff);
 }
 
 // get the active SPU track
@@ -454,6 +456,7 @@ void ddvd_get_spu_byid(struct ddvd *pconfig, int spu_id, void *lang)
 	if (spu_id < MAX_SPU && pconfig->spu_map[spu_id] > -1)
 		spu_lang = dvdnav_spu_stream_to_lang(dvdnav, pconfig->spu_map[spu_id]);
 	memcpy(lang, &spu_lang, sizeof(uint16_t));
+	Debug(2, "ddvd_get_spu_byid %d %c%c\n", spu_id, spu_lang >> 8, spu_lang & 0xff);
 }
 
 // get dvd title string
@@ -960,7 +963,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 				else
 					offset = (ddvd_trickspeed - 1) * 90000L * FORWARD_WAIT/1000;
 				int64_t newpos = (int64_t)pos +(offset + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
-				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - vpts=%llu pts=%llu\n", now, pos, newpos, offset, vpts, pts);
+				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - SPU clr=%d->%d vpts=%llu pts=%llu\n", now, pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
 
 				if (newpos <= 0) {	// reached begin of movie
 					newpos = 0;
@@ -1080,7 +1083,7 @@ send_message:
 				if (now >= ddvd_wait_timer_end) {
 					ddvd_wait_timer_active = 0;
 					dvdnav_still_skip(dvdnav);
-					//Debug(1, "wait timer done\n");
+					Debug(1, "wait timer done\n");
 				}
 			}
 			// SPU timer
@@ -1120,7 +1123,7 @@ send_message:
 							vpts |= (buf[14 + 11] >> 1) << 15;
 							vpts |= buf[14 + 12] << 7;
 							vpts |= (buf[14 + 13] >> 1);
-							//Debug(1, "VPTS=%X\n", (int) vpts);
+							//Debug(1, "VPTS=%llu\n", vpts);
 						}
 #if CONFIG_API_VERSION == 1
 						// Eliminate 00 00 01 B4 sequence error packet because it breaks the pallas mpeg decoder
@@ -1461,7 +1464,7 @@ send_message:
 						}
 					}
 					else if ((buf[14 + 3]) == 0xBD && ((buf[14 + buf[14 + 8] + 9]) & 0xE0) == 0x20 && ((buf[14 + buf[14 + 8] + 9]) & 0x1F) == spu_active_id) {	// SPU packet
-						Debug(2, "SPU BLOCK: spu_nr=%d/%d vpts=%llu pts=%llu highlight=%d\n", ddvd_spu_play, ddvd_spu_ind, vpts, pts, have_highlight);
+						Debug(2, "DVD SPU BLOCK: spu_nr=%d/%d vpts=%llu pts=%llu highlight=%d\n", ddvd_spu_play, ddvd_spu_ind, vpts, pts, have_highlight);
 						if (buf[14 + 7] & 128) {
 							/* damn gcc bug */
 							spts = ((unsigned long long)(((buf[14 + 9] >> 1) & 7))) << 30;
@@ -1472,8 +1475,7 @@ send_message:
 #if CONFIG_API_VERSION == 1
 							spts >>= 1;	// need a corrected "spts" because vulcan/pallas will give us a 32bit pts instead of 33bit
 #endif
-							int f = spts/90000;
-							Debug(2, "                                                                 SPTS=%llu  %3d:  %d:%02d:%02d.05d\n", spts, ddvd_spu_ind, f/3600, (f%3600)/60, f%60, (spts%90000)*10/9);
+							Debug(2, "                                                                 SPTS=%llu  %3d:  %d:%02d:%02d.%05d\n", spts, ddvd_spu_ind, (int)(spts/90000/3600), (int)(spts/90000/60)%60, (int)(spts/90000)%60, (int)(spts%90000)*10/9);
 						}
 
 						int i = ddvd_spu_ind % NUM_SPU_BACKBUFFER;
@@ -1522,7 +1524,7 @@ send_message:
 				}
 				else
 					ddvd_wait_for_user = 1;
-				Debug(2, "DVDNAV_STILL_FRAME: lenght=%d pts=%llu\n", still_event->length, pts);
+				Debug(4, "DVDNAV_STILL_FRAME: lenght=%d vpts=%llu pts=%llu\n", still_event->length, vpts, pts);
 				break;
 
 			case DVDNAV_WAIT:
@@ -1579,7 +1581,7 @@ send_message:
 				break;
 
 			case DVDNAV_SPU_STREAM_CHANGE:
-				Debug(2, "DVDNAV_SPU_STREAM_CHANGE vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
+				Debug(2, "DVDNAV_SPU_STREAM_CHANGE vpts=%llu pts=%llu highlight=%d spu_lock=%d\n", vpts, pts, have_highlight, spu_lock);
 				/* We received a new SPU stream ID */
 				if (spu_lock)
 					break;
@@ -1623,7 +1625,8 @@ send_message:
 				safe_write(message_pipe, &msg, sizeof(int));
 				safe_write(message_pipe, &report_spu, sizeof(int));
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
-				Debug(3, "SPU Stream change: w %d l: %d p: %d active: %d spu_lang=%04X\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan, spu_active_id, spu_lang);
+				Debug(3, "SPU Stream change: w %d l: %d p: %d log: %d logid: %d active: %d prevactive: %d spu_lang=%04X %c%c\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan, ev->logical, spu_id_logical, spu_active_id, old_active_id, spu_lang, spu_lang >> 8, spu_lang & 0xFF);
+				spu_active_id &= 0x1F;
 				break;
 
 			case DVDNAV_AUDIO_STREAM_CHANGE:
@@ -1636,7 +1639,7 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Prepare to display some Buttons */
-				Debug(2, "DVDNAV_HIGHLIGHT clear=%d vpts=%llu pts=%llu\n", ddvd_clear_buttons, vpts, pts);
+				Debug(2, "DVDNAV_HIGHLIGHT clear=%d vpts=%llu pts=%llu highlight=%d\n", ddvd_clear_buttons, vpts, pts, have_highlight);
 				{
 					dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
 					if (!ddvd_clear_buttons && highlight_event.buttonN != hl->buttonN ||
@@ -1667,7 +1670,10 @@ send_message:
 						spu_tmp = dvdnav_get_spu_logical_stream(dvdnav, count_tmp);
 						if (spu_tmp >= 0 && spu_tmp < MAX_SPU) {
 							playerconfig->spu_map[spu_tmp] = count_tmp;
-							Debug(2, "    spu %d -> logical stream %d\n", spu_tmp, count_tmp);
+							int lang = dvdnav_spu_stream_to_lang(dvdnav, count_tmp);
+							Debug(2, "    MPEG spu stream %d -> logical stream %d - %04X %c%c\n", spu_tmp, count_tmp, lang,
+										lang == 0xFFFF ? 'N' : lang >> 8, 
+										lang == 0xFFFF ? 'A' : lang & 0xFF);
 						}
 					}
 
@@ -1891,9 +1897,8 @@ send_message:
 				// so we have to clear the screen if there is such a case
 				if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
 					ddvd_clear_screen = 1;
-					Debug(3, "clear p_lfb, physical screen, new SPU, vpts=%llu, pts=%llu spts=%llu highlight=%d, spu_timer_active=%d, sputime=%d\n", vpts, pts, spupts, have_highlight, ddvd_spu_timer_active, last_spu_return.display_time);
+				Debug(3, "clear p_lfb, physical screen, new SPU, vpts=%llu pts=%llu spts=%llu highlight=%d spu_timer_active=%d lastsputime=%d\n", vpts, pts, spupts, have_highlight, ddvd_spu_timer_active, last_spu_return.display_time);
 				}
-
 				ddvd_lbb_changed = 1;
 				// set timer
 				if (cur_spu_return.display_time > 0) {
@@ -2076,8 +2081,8 @@ send_message:
 				ddvd_screeninfo_xres != 720) && !playerconfig->canscale) {
 				// decide which resize routine we should use
 				// on 4bpp mode we use bicubic resize for sd skins because we get much better results
-				// with subtitles and the speed is ok for hd skins we use nearest neighbor resize
-				// because upscaling to hd is too slow with bicubic resize
+				// with subtitles and the speed is ok for hd skins we use nearest neighbor resize because
+				// upscaling to hd is too slow with bicubic resize
 				resized = 1;
 				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres,
 												x_offset, y_offset, blit_area.x_start, blit_area.x_end,
@@ -2147,7 +2152,7 @@ send_message:
 
 		//Userinput
 		if (ddvd_wait_for_user) {
-			Debug(3, "Waiting for keypress - %spaused\n", ddvd_playmode == PAUSE ? "" : "not ");
+			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu\n", ddvd_playmode == PAUSE ? "" : "not ", vpts, pts);
 			struct pollfd pfd[1];	// make new pollfd array
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
@@ -2156,6 +2161,7 @@ send_message:
 		if (ddvd_readpipe(key_pipe, &rccode, sizeof(int), 0) == sizeof(int)) {
 			int keydone = 1;
 
+			Debug(2, "Got key %d menu %d playermenu %d\n", rccode, in_menu, playerconfig->in_menu);
 			switch (rccode) {	// actions inside and outside of menu
 				case DDVD_SET_MUTE:
 					ismute = 1;
@@ -2286,12 +2292,13 @@ send_message:
 						dvdnav_part_play(dvdnav, titleNo, 1);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
+						Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						break;
 					}
 					case DDVD_KEY_PAUSE:	// Pause
 					{
-						Debug(3, "DDVD_KEY_PAUSE (or pause fallthrough)\n");
+						Debug(3, "DDVD_KEY_PAUSE on %s\n", ddvd_playmode == PLAY ? "play" : "pause");
 						if (ddvd_playmode == PLAY) {
 							ddvd_playmode = PAUSE;
 							if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
@@ -2309,7 +2316,7 @@ send_message:
 					}
 					case DDVD_KEY_PLAY:	// Play
 					{
-						Debug(3, "DDVD_KEY_PLAY (or pause fallthrough)\n");
+						Debug(3, "DDVD_KEY_PLAY on %s\n", ddvd_playmode == PLAY ? "play" : "pause fallthrough");
 						if (ddvd_playmode == PAUSE || ddvd_trickmode != TOFF) {
 							if (ddvd_playmode == PAUSE)
 								ddvd_wait_for_user = 0;
@@ -2456,6 +2463,7 @@ key_play:
 					{
 						uint16_t spu_lang = 0xFFFF;
 						int spu_id_logical;
+						int old_active_id = spu_active_id;
 						if (rccode == DDVD_KEY_SUBTITLE) {
 							int count_tmp;
 							spu_id_logical = -1;
@@ -2471,7 +2479,6 @@ key_play:
 						}
 						else {
 							ddvd_readpipe(key_pipe, &spu_id_logical, sizeof(int), 1);
-							Debug(1, "DDVD_SET_SUBTITLE %i (prev %i)\n", spu_id_logical, spu_active_id);
 							if (spu_id_logical < MAX_SPU && playerconfig->spu_map[spu_id_logical] > -1)
 								spu_active_id = dvdnav_get_spu_logical_stream(dvdnav, spu_id_logical);
 						}
@@ -2482,6 +2489,7 @@ key_play:
 							spu_id_logical = -1;
 							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						}
+						Debug(1, "DDVD_SET_SUBTITLE CURRENT log=%d act=%d prevact=%d - %c%c\n", spu_id_logical, spu_active_id, old_active_id, spu_lang >> 8, spu_lang & 0xFF);
 						spu_lock = 1;
 						msg = DDVD_SHOWOSD_SUBTITLE;
 						int report_spu = spu_id_logical > 31 ? -1 : spu_id_logical;
@@ -2577,6 +2585,7 @@ err_malloc:
 #if CONFIG_API_VERSION == 3
 	ddvd_unset_pcr_offset();
 #endif
+	Debug(1, "EXIT\n");
 	return res;
 }
 
