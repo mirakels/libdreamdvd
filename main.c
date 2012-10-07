@@ -1875,13 +1875,15 @@ send_message:
 		 */
 		if (ddvd_spu_play < ddvd_spu_ind && spudiff >= 0 && (vpts > pts || spupts+5 > vpts && spudiff < 2*90000)) {
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
-			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spts); // decode
-			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %d %d %d %d\n",
+			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spupts); // decode
+			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %dx%d %dx%d btns=%d displaytime=%d\n",
 				ddvd_spu_play, pts, spupts,
-				cur_spu_return.x_start, cur_spu_return.x_end,
-				cur_spu_return.y_start, cur_spu_return.y_end);
+				cur_spu_return.x_start, cur_spu_return.y_start,
+				cur_spu_return.x_end, cur_spu_return.y_end,
+				pci->hli.hl_gi.btn_ns, cur_spu_return.display_time);
 			ddvd_spu_play++;
 
+			// process spu data
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				// highlight/button
 				int buttonN;
@@ -1892,6 +1894,7 @@ send_message:
 					buttonN = pci->hli.hl_gi.btn_ns;
 				dvdnav_button_select(dvdnav, pci, buttonN);
 				have_highlight = 1;
+				in_menu = 1;
 				Debug(2, "update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
 				Debug(2, "switching to menu\n");
 			}
