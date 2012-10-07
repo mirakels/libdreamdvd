@@ -968,12 +968,12 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 				if (newpos <= 0) {	// reached begin of movie
 					newpos = 0;
 					reached_sof = 1;
-					msg = DDVD_SHOWOSD_TIME;
+					// msg = DDVD_SHOWOSD_TIME; // Is osd update needed every jump?
 				}
 				else if (newpos >= len) {	// reached end of movie
 					newpos = len - 250;
 					reached_eof = 1;
-					msg = DDVD_SHOWOSD_TIME;
+					// msg = DDVD_SHOWOSD_TIME; // Is osd update needed every jump?
 				}
 				else
 					msg = ddvd_trickmode & TRICKFW ? DDVD_SHOWOSD_STATE_FFWD : DDVD_SHOWOSD_STATE_FBWD;
