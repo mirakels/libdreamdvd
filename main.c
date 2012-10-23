@@ -1889,7 +1889,7 @@ send_message:
 				dvdnav_button_select(dvdnav, pci, buttonN);
 				have_highlight = 1;
 				in_menu = 1;
-				Debug(2, "update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
+				Debug(2, "Update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
 				Debug(2, "switching to menu\n");
 			}
 			else {
@@ -1916,9 +1916,10 @@ send_message:
 						cur_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
 					ddvd_lbb_changed = 0;
 					ddvd_spu_timer_active = 0;
+					Debug(2, "do not display this spu: active stream=%u spulock=%d type=%s\n", dvdnav_get_active_spu_stream(dvdnav), spu_lock,
+							cur_spu_return.force_hide == SPU_HIDE ? "hide" : cur_spu_return.force_hide == SPU_FORCE ? "force" : "show");
 				}
 			}
-
 		}
 
 		// subtitle handling
@@ -2046,12 +2047,10 @@ send_message:
 				blit_area.x_end = hl.ex;
 				blit_area.y_start = hl.sy;
 				blit_area.y_end = hl.ey;
-				libdvdnav_workaround = 1;
 				draw_osd = 1;
 				Debug(3, "BUT new  bbox: %dx%d %dx%d\n",
 						blit_area.x_start, blit_area.y_start,
 						blit_area.x_end, blit_area.y_end);
-
 			}
 			else {
 				Debug(3, "DOBUTTON libdvdnav_workaround=0 - no drawing!\n");
@@ -2266,6 +2265,7 @@ send_message:
 						dvdnav_part_play(dvdnav, titleNo, chapterNo);
 						ddvd_play_empty(TRUE);
 						msg = DDVD_SHOWOSD_TIME;
+						Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						break;
 					}
@@ -2430,6 +2430,7 @@ key_play:
 							dvdnav_sector_search(dvdnav, newpos, SEEK_SET);
 							ddvd_lpcm_count = 0;
 							msg = DDVD_SHOWOSD_TIME;
+							Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
 						}
 						break;
