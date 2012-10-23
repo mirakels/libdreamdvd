@@ -1501,8 +1501,16 @@ send_message:
 
 						int spulen = ddvd_spu[i][0] << 8 | ddvd_spu[i][1];
 						if (ddvd_spu_ptr >= spulen) {	// SPU packet complete ?
-							spu_backpts[i] = spts;	// store pts
-							ddvd_spu_ind++;
+							int j = (i - 1) % NUM_SPU_BACKBUFFER;
+							if (spu_backpts[j] == spts && ddvd_spu_play < ddvd_spu_ind) {  // same spu. Copy data to previous buffer
+								memcpy(ddvd_spu[j], ddvd_spu[i], spulen);
+								Debug(1, "SPU duplicate %d, %d\n", ddvd_spu_play, ddvd_spu_ind);
+								i = j; // to get proper ddvd_pci index
+							}
+							else {
+								spu_backpts[i] = spts;	// store pts
+								ddvd_spu_ind++;
+							}
 							memcpy(ddvd_pci[i], dvdnav_get_current_nav_pci(dvdnav), sizeof(pci_t));
 							ddvd_spu_ptr = 0;
 						}
