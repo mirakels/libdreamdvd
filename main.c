@@ -2724,22 +2724,28 @@ static void ddvd_play_empty(int device_clear)
 static void ddvd_device_clear(void)
 {
 	Debug(3, "device_clear: clear audio and video buffers\n");
+	if (ioctl(ddvd_fdaudio, AUDIO_STOP) < 0)
+		perror("LIBDVD: AUDIO_STOP");
+	if (ioctl(ddvd_fdvideo, VIDEO_STOP, 1) < 0)
+		perror("LIBDVD: VIDEO_STOP");
+
 	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
 		perror("LIBDVD: AUDIO_CLEAR_BUFFER");
-	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
-		perror("LIBDVD: AUDIO_PLAY");
-	if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
-		perror("LIBDVD: AUDIO_CONTINUE");
-
 	if (ioctl(ddvd_fdvideo, VIDEO_CLEAR_BUFFER) < 0)
 		perror("LIBDVD: VIDEO_CLEAR_BUFFER");
-	if (ioctl(ddvd_fdvideo, VIDEO_PLAY) < 0)
-		perror("LIBDVD: VIDEO_PLAY");
-	if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-		perror("LIBDVD: VIDEO_CONTINUE");
 
 	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
 		perror("LIBDVD: AUDIO_SET_AV_SYNC");
+
+	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
+		perror("LIBDVD: AUDIO_PLAY");
+	if (ioctl(ddvd_fdvideo, VIDEO_PLAY) < 0)
+		perror("LIBDVD: VIDEO_PLAY");
+
+	if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
+		perror("LIBDVD: AUDIO_CONTINUE");
+	if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+		perror("LIBDVD: VIDEO_CONTINUE");
 }
 
 // SPU Decoder
