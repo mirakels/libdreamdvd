@@ -146,7 +146,6 @@ dvdnav_t *dvdnav;
 dvdnav_cell_change_event_t ddvd_lastCellEventInfo;
 
 int ddvd_wait_for_user;
-int ddvd_clear_buttons;
 int ddvd_lpcm_count;
 int ddvd_iframerun;
 int ddvd_still_frame;

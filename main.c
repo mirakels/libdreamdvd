@@ -1637,17 +1637,11 @@ send_message:
 
 			case DVDNAV_HIGHLIGHT:
 				/* Prepare to display some Buttons */
-				Debug(2, "DVDNAV_HIGHLIGHT clear=%d vpts=%llu pts=%llu highlight=%d\n", ddvd_clear_buttons, vpts, pts, have_highlight);
-				{
-					dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
-					if (!ddvd_clear_buttons && highlight_event.buttonN != hl->buttonN ||
-						highlight_event.pts != hl->pts) {
-						Debug(2, "HIGHLIGHT RECEIVED  button=%d mode=%d, bpts=%u\n", hl->buttonN, hl->display, hl->pts);
-						memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
-						have_highlight = 1;
-					}
-				}
-				ddvd_clear_buttons = 0;
+				dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
+				Debug(2, "DVDNAV_HIGHLIGHT vpts=%llu pts=%llu highlight=%d button=%d mode=%d, bpts=%u%s\n", vpts, pts, have_highlight, hl->buttonN, hl->display, hl->pts,
+						(highlight_event.buttonN == hl->buttonN && highlight_event.pts == hl->pts) ?  " -- probably same as previous" : "");
+				memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
+				have_highlight = 1;
 				break;
 
 			case DVDNAV_VTS_CHANGE:
@@ -2222,7 +2216,6 @@ send_message:
 						Debug(3, "'OK' clear screen, clear buttons\n");
 						ddvd_wait_for_user = 0;
 						ddvd_play_empty(TRUE);
-						ddvd_clear_buttons = 1;
 						if (ddvd_wait_timer_active)
 							ddvd_wait_timer_active = 0;
 						dvdnav_button_activate(dvdnav, pci);
@@ -2696,7 +2689,6 @@ static void ddvd_play_empty(int device_clear)
 {
 	Debug(3, "ddvd_play_empty clear=%d\n", device_clear);
 	ddvd_wait_for_user = 0;
-	ddvd_clear_buttons = 0;
 	ddvd_lpcm_count = 0;
 	ddvd_iframerun = 0;
 	ddvd_still_frame = 0;
