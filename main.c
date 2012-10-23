@@ -2271,8 +2271,8 @@ send_message:
 						if (chapterNo <= 0)
 							chapterNo = totalChapters;
 						Debug(1, "DDVD_SET_CHAPTER %d/%d in title %d\n", chapterNo, totalChapters, titleNo);
-						dvdnav_part_play(dvdnav, titleNo, chapterNo);
 						ddvd_play_empty(TRUE);
+						dvdnav_part_play(dvdnav, titleNo, chapterNo);
 						msg = DDVD_SHOWOSD_TIME;
 						Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
@@ -2298,8 +2298,8 @@ send_message:
 						if (titleNo <= 0)
 							titleNo = totalTitles;
 						Debug(1, "DDVD_SET_TITLE %d/%d\n", titleNo, totalTitles);
-						dvdnav_part_play(dvdnav, titleNo, 1);
 						ddvd_play_empty(TRUE);
+						dvdnav_part_play(dvdnav, titleNo, 1);
 						msg = DDVD_SHOWOSD_TIME;
 						Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
