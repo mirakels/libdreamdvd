@@ -638,11 +638,18 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 #define SPU_BUFLEN   (2 * (128 * 1024))
 	unsigned long long spu_backpts[NUM_SPU_BACKBUFFER];
 	unsigned char *ddvd_spu[NUM_SPU_BACKBUFFER];
+	pci_t *ddvd_pci[NUM_SPU_BACKBUFFER];
 	{   int  i;
 		for (i = 0; i < NUM_SPU_BACKBUFFER; i++)  {
 			ddvd_spu[i] = malloc(SPU_BUFLEN);    // buffers for decoded SPU packets
 			if (ddvd_spu[i] == NULL) {
 				perror("LIBDVD: SPU backbuffer <mem allocation failed>");
+				res = DDVD_NOMEM;
+				goto err_malloc;
+			}
+			ddvd_pci[i] = malloc(sizeof(pci_t));    // buffers for pci packets
+			if (ddvd_pci[i] == NULL) {
+				perror("LIBDVD: PCI backbuffer <mem allocation failed>");
 				res = DDVD_NOMEM;
 				goto err_malloc;
 			}
@@ -1495,8 +1502,9 @@ send_message:
 						int spulen = ddvd_spu[i][0] << 8 | ddvd_spu[i][1];
 						if (ddvd_spu_ptr >= spulen) {	// SPU packet complete ?
 							spu_backpts[i] = spts;	// store pts
-							ddvd_spu_ptr = 0;
 							ddvd_spu_ind++;
+							memcpy(ddvd_pci[i], dvdnav_get_current_nav_pci(dvdnav), sizeof(pci_t));
+							ddvd_spu_ptr = 0;
 						}
 					}
 				}
@@ -1870,6 +1878,7 @@ send_message:
 		if (ddvd_spu_play < ddvd_spu_ind && spudiff >= 0 && (vpts > pts || spupts+5 > vpts && spudiff < 2*90000)) {
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
 			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spupts); // decode
+			pci = ddvd_pci[ddvd_spu_play % NUM_SPU_BACKBUFFER];
 			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %dx%d %dx%d btns=%d displaytime=%d\n",
 				ddvd_spu_play, pts, spupts,
 				cur_spu_return.x_start, cur_spu_return.y_start,
