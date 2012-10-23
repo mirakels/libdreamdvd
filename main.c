@@ -2180,8 +2180,12 @@ send_message:
 					break;
 				case DDVD_KEY_MENU:	//Dream
 				case DDVD_KEY_AUDIOMENU:	//Audio
-					if (dvdnav_menu_call(dvdnav, rccode == DDVD_KEY_MENU ? DVD_MENU_Root : DVD_MENU_Audio) == DVDNAV_STATUS_OK)
+					if (dvdnav_menu_call(dvdnav, rccode == DDVD_KEY_MENU ? DVD_MENU_Root : DVD_MENU_Audio) == DVDNAV_STATUS_OK) {
 						ddvd_play_empty(TRUE);
+						ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
+						ddvd_playmode = PLAY;
+						goto key_play;
+					}
 					break;
 				default:
 					keydone = 0;
