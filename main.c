@@ -2601,9 +2601,12 @@ err_open_output_fd:
 
 err_malloc:
 	// clean up
-	for (i = 0; i < NUM_SPU_BACKBUFFER; i++)
+	for (i = 0; i < NUM_SPU_BACKBUFFER; i++) {
 		if (ddvd_spu[i] != NULL)
 			free(ddvd_spu[i]);
+		if (ddvd_pci[i] != NULL)
+			free(ddvd_pci[i]);
+	}
 	if (ddvd_lbb != NULL)
 		free(ddvd_lbb);
 	if (ddvd_lbb2 != NULL)
