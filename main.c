@@ -916,6 +916,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	ddvd_clear_screen = 0;
 
 	int have_highlight = 0;
+	int ddvd_wait_highlight = 0;
 	dvdnav_highlight_event_t highlight_event;
 
 	ddvd_play_empty(FALSE);
@@ -1898,13 +1899,20 @@ send_message:
 			if (pci->hli.hl_gi.btn_ns > 0) {
 				// highlight/button
 				int buttonN;
-				dvdnav_get_current_highlight(dvdnav, &buttonN);
-				if (buttonN == 0)
-					buttonN = 1;
-				if (buttonN > pci->hli.hl_gi.btn_ns)
-					buttonN = pci->hli.hl_gi.btn_ns;
-				dvdnav_button_select(dvdnav, pci, buttonN);
-				have_highlight = 1;
+				if (!have_highlight) {
+					// got a Highlight SPU but no highlight event yet.
+					// Force getting one
+					dvdnav_get_current_highlight(dvdnav, &buttonN);
+					if (buttonN == 0)
+						buttonN = 1;
+					if (buttonN > pci->hli.hl_gi.btn_ns)
+						buttonN = pci->hli.hl_gi.btn_ns;
+					dvdnav_button_select(dvdnav, pci, buttonN);
+					ddvd_wait_highlight = 1; // still frame might already have set 'wait_for_user'. This will first wait for the highlight to be drawn
+					Debug(2, "FORCE highlight button %d\n", buttonN);
+				}
+				else
+					buttonN = highlight_event.buttonN;
 				in_menu = 1;
 				Debug(2, "Update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
 				Debug(2, "switching to menu\n");
@@ -1988,6 +1996,7 @@ send_message:
 		// highlight/button handling
 		if (have_highlight) {
 			have_highlight = 0;
+			ddvd_wait_highlight = 0; // no need to hold 'wait_for_user' any longer
 			Debug(3, "HIGHLIGHT DRAW Selected button=%d mode=%d, bpts=%u vpts=%llu pts=%llu\n", highlight_event.buttonN, highlight_event.display, highlight_event.pts, vpts, pts);
 
 			ddvd_clear_screen = 1;
@@ -2168,7 +2177,7 @@ send_message:
 		}
 
 		//Userinput
-		if (ddvd_wait_for_user) {
+		if (ddvd_wait_for_user && !ddvd_wait_highlight) {
 			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu\n", ddvd_playmode == PAUSE ? "" : "not ", vpts, pts);
 			struct pollfd pfd[1];	// make new pollfd array
 			pfd[0].fd = key_pipe;
