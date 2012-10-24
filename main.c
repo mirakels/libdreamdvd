@@ -945,11 +945,11 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int reached_eof = 0;
 	int reached_sof = 0;
 	uint64_t now;
+	int in_menu = 0;
 
 	while (!finished) {
 		pci_t *pci = 0;
 		dsi_t *dsi = 0;
-		int in_menu;
 		int draw_osd = 0;
 
 		/* the main reading function */
@@ -1820,7 +1820,6 @@ send_message:
 		}
 
 		pci = dvdnav_get_current_nav_pci(dvdnav);
-		in_menu = pci && pci->hli.hl_gi.btn_ns > 0;
 
 		// spu and highlight/button handling
 		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
@@ -1994,7 +1993,7 @@ send_message:
 		}
 
 		// highlight/button handling
-		if (have_highlight) {
+		if (in_menu && have_highlight) {
 			have_highlight = 0;
 			ddvd_wait_highlight = 0; // no need to hold 'wait_for_user' any longer
 			Debug(3, "HIGHLIGHT DRAW Selected button=%d mode=%d, bpts=%u vpts=%llu pts=%llu\n", highlight_event.buttonN, highlight_event.display, highlight_event.pts, vpts, pts);
@@ -2143,7 +2142,7 @@ send_message:
 		}
 
 		// final menu status check
-		if (!playerconfig->in_menu && in_menu && (dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav))) {
+		if (in_menu && !playerconfig->in_menu && (dvdnav_is_domain_vmgm(dvdnav) || dvdnav_is_domain_vtsm(dvdnav))) {
 			int bla = DDVD_MENU_OPENED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 1;
@@ -2153,6 +2152,7 @@ send_message:
 			int bla = DDVD_MENU_CLOSED;
 			safe_write(message_pipe, &bla, sizeof(int));
 			playerconfig->in_menu = 0;
+			in_menu = 0;
 			Debug(3, "MENU_CLOSED vpts=%llu, pts=%llu highlight=%d!!!\n", vpts, pts, have_highlight);
 		}
 
