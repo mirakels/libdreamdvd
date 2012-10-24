@@ -2726,8 +2726,6 @@ static void ddvd_play_empty(int device_clear)
 	ddvd_iframesend = 0;
 	ddvd_last_iframe_len = 0;
 	ddvd_spu_ptr = 0;
-	ddvd_spu_backnr = 0;
-	ddvd_spu_backptr = 0;
 
 	ddvd_wait_timer_active = 0;
 	ddvd_wait_timer_end = 0;

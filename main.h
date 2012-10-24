@@ -152,7 +152,6 @@ int ddvd_still_frame;
 int ddvd_iframesend;
 int ddvd_last_iframe_len;
 int ddvd_spu_ptr;
-int ddvd_spu_backptr,ddvd_spu_backnr;
 int ddvd_lbb_changed;
 int ddvd_clear_screen;
 
