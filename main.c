@@ -1873,7 +1873,7 @@ send_message:
 #endif
 		/*
 		 * When vpts > pts we are still in a normal stream so check on spudif is enough.
-		 * But when vpts < pts, libdvdnav already is working on a new video fragment possible sending out PSU.
+		 * But when vpts < pts, libdvdnav already is working on a new video fragment (PGC) possible sending out PSU.
 		 * In that case we should only display the SPU if the spupts is still from the previous video (spupts > vpts)
 		 * and the SPU is within 2 seconds of the pts (spudiff < 2*90000).
 		 * (FIXME: why do we need this last check?, maybe doing this last check is just enough...)
@@ -1883,20 +1883,20 @@ send_message:
 			memset(ddvd_lbb, 0, 720 * 576);	// clear decode buffer ..
 			cur_spu_return = ddvd_spu_decode_data(ddvd_lbb, ddvd_spu[ddvd_spu_play % NUM_SPU_BACKBUFFER], spupts); // decode
 			pci = ddvd_pci[ddvd_spu_play % NUM_SPU_BACKBUFFER];
-			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %dx%d %dx%d btns=%d displaytime=%d\n",
+			Debug(2, "SPU current=%d pts=%llu spupts=%llu bbox: %dx%d %dx%d btns=%d highlight=%d displaytime=%d %s\n",
 				ddvd_spu_play, pts, spupts,
 				cur_spu_return.x_start, cur_spu_return.y_start,
 				cur_spu_return.x_end, cur_spu_return.y_end,
-				pci->hli.hl_gi.btn_ns, cur_spu_return.display_time);
+				pci->hli.hl_gi.btn_ns, have_highlight, cur_spu_return.display_time,
+				cur_spu_return.force_hide == SPU_HIDE ? "hide" : cur_spu_return.force_hide == SPU_FORCE ? "force" : "show");
 			ddvd_spu_play++;
 
 			// process spu data
-			if (pci->hli.hl_gi.btn_ns > 0) {
+			if (cur_spu_return.force_hide == SPU_FORCE) {
 				// highlight/button
 				int buttonN;
 				if (!have_highlight) {
-					// got a Highlight SPU but no highlight event yet.
-					// Force getting one
+					// got a Highlight SPU but no highlight event yet. Force getting one
 					dvdnav_get_current_highlight(dvdnav, &buttonN);
 					if (buttonN == 0)
 						buttonN = 1;
@@ -1909,83 +1909,61 @@ send_message:
 				else
 					buttonN = highlight_event.buttonN;
 				in_menu = 1;
-				Debug(2, "Update highlight buttons - %d of %d, highlight=%d\n", buttonN, pci->hli.hl_gi.btn_ns, have_highlight);
-				Debug(2, "switching to menu\n");
+				Debug(2, "Update highlight buttons - %d of %d, switching to menu\n", buttonN, pci->hli.hl_gi.btn_ns);
 			}
-			else {
+			else if (cur_spu_return.force_hide == SPU_SHOW) {
 				// subtitle
-				// we dont support overlapping spu timers yet,
-				// so we have to clear the screen if there is such a case
+				// overlapping spu timers not supported yet, so clear the screen in that case
 				if (ddvd_spu_timer_active || last_spu_return.display_time < 0) {
 					ddvd_clear_screen = 1;
-				Debug(3, "clear p_lfb, physical screen, new SPU, vpts=%llu pts=%llu spts=%llu highlight=%d spu_timer_active=%d lastsputime=%d\n", vpts, pts, spupts, have_highlight, ddvd_spu_timer_active, last_spu_return.display_time);
+					Debug(3, "clear p_lfb, physical screen, new SPU, vpts=%llu pts=%llu spts=%llu highlight=%d spu_timer_active=%d lastsputime=%d\n", vpts, pts, spupts, have_highlight, ddvd_spu_timer_active, last_spu_return.display_time);
 				}
-				ddvd_lbb_changed = 1;
-				// set timer
-				if (cur_spu_return.display_time > 0) {
+				// dont display SPU if displaytime is <= 0 or the actual SPU track is marked as hide (bit 7)
+				if (cur_spu_return.display_time <= 0 || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) && !spu_lock)) {
+					ddvd_spu_timer_active = 0;
+					Debug(2, "do not display this spu: active stream=%u spulock=%d\n", dvdnav_get_active_spu_stream(dvdnav), spu_lock);
+				}
+				else {
+					// set timer and prepare backbuffer
 					ddvd_spu_timer_active = 1;
-					ddvd_spu_timer_end = now + cur_spu_return.display_time * 10;	//ms
+					ddvd_spu_timer_end = now + cur_spu_return.display_time * 10; //ms
+					Debug(3, "    drawing subtitle, vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
+					if (ddvd_screeninfo_bypp == 1) {
+						struct ddvd_color colnew;
+						int ctmp;
+						msg = DDVD_COLORTABLE_UPDATE;
+						safe_write(message_pipe, &msg, sizeof(int));
+						for (ctmp = 0; ctmp < 4; ctmp++) {
+							colnew.blue = ddvd_bl[ctmp + 252];
+							colnew.green = ddvd_gn[ctmp + 252];
+							colnew.red = ddvd_rd[ctmp + 252];
+							colnew.trans = ddvd_tr[ctmp + 252];
+							safe_write(message_pipe, &colnew, sizeof(struct ddvd_color));
+						}
+						msg = DDVD_NULL;
+						memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
+					}
+					else {
+						ddvd_resize_pixmap = (ddvd_screeninfo_xres > 720) ? // set resize function
+										&ddvd_resize_pixmap_xbpp : &ddvd_resize_pixmap_xbpp_smooth;
+						memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);    //clear backbuffer ..
+						int i = 0;
+						for (i = cur_spu_return.y_start; i < cur_spu_return.y_end; ++i)
+							ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + cur_spu_return.x_start) * ddvd_screeninfo_bypp,
+												ddvd_lbb + i * 720 + cur_spu_return.x_start,
+												cur_spu_return.x_end - cur_spu_return.x_start);
+					}
+
+					blit_area.x_start = cur_spu_return.x_start;
+					blit_area.x_end = cur_spu_return.x_end;
+					blit_area.y_start = cur_spu_return.y_start;
+					blit_area.y_end = cur_spu_return.y_end;
+
+					draw_osd = 1;
 				}
-				else
-					ddvd_spu_timer_active = 0;
-
-				// dont display SPU if spu sets the HIDE command
-				// or the actual SPU track is marked as hide (bit 7)
-				// and the packet had no FORCE command
-				if (cur_spu_return.force_hide == SPU_HIDE || ((dvdnav_get_active_spu_stream(dvdnav) & 0x80) &&
-						cur_spu_return.force_hide != SPU_FORCE && !spu_lock)) {
-					ddvd_lbb_changed = 0;
-					ddvd_spu_timer_active = 0;
-					Debug(2, "do not display this spu: active stream=%u spulock=%d type=%s\n", dvdnav_get_active_spu_stream(dvdnav), spu_lock,
-							cur_spu_return.force_hide == SPU_HIDE ? "hide" : cur_spu_return.force_hide == SPU_FORCE ? "force" : "show");
-				}
 			}
-		}
-
-		// subtitle handling
-		if (ddvd_lbb_changed == 1) {
-			Debug(3, "    drawing subtitle, vpts=%llu pts=%llu highlight=%d\n", vpts, pts, have_highlight);
-			if (ddvd_screeninfo_bypp == 1) {
-				struct ddvd_color colnew;
-				int ctmp;
-				msg = DDVD_COLORTABLE_UPDATE;
-				safe_write(message_pipe, &msg, sizeof(int));
-				for (ctmp = 0; ctmp < 4; ctmp++) {
-					colnew.blue = ddvd_bl[ctmp + 252];
-					colnew.green = ddvd_gn[ctmp + 252];
-					colnew.red = ddvd_rd[ctmp + 252];
-					colnew.trans = ddvd_tr[ctmp + 252];
-					safe_write(message_pipe, &colnew, sizeof(struct ddvd_color));
-				}
-				msg = DDVD_NULL;
-				memcpy(ddvd_lbb2, ddvd_lbb, 720 * 576);
-			}
-			else {
-				ddvd_resize_pixmap = (ddvd_screeninfo_xres > 720) ? // set resize function
-							&ddvd_resize_pixmap_xbpp : &ddvd_resize_pixmap_xbpp_smooth;
-				memset(ddvd_lbb2, 0, ddvd_screeninfo_stride * ddvd_screeninfo_yres);    //clear backbuffer ..
-				int i = 0;
-				for (i = cur_spu_return.y_start; i < cur_spu_return.y_end; ++i)
-					ddvd_blit_to_argb(ddvd_lbb2 + (i * 720 + cur_spu_return.x_start) * ddvd_screeninfo_bypp,
-										ddvd_lbb + i * 720 + cur_spu_return.x_start,
-										cur_spu_return.x_end - cur_spu_return.x_start);
-			}
-
-			blit_area.x_start = cur_spu_return.x_start;
-			blit_area.x_end = cur_spu_return.x_end;
-			blit_area.y_start = cur_spu_return.y_start;
-			blit_area.y_end = cur_spu_return.y_end;
-			if (!ddvd_spu_timer_active) {
-				/* in case this is the last action for this subtitle's bbox
-				   (i.e. no timer has been set), then we will clear the bbox.
-				   otherwise, we will leave it there, so it will be contained
-				   in the next update as well. */
-				cur_spu_return.x_start = cur_spu_return.x_end = 0;
-				cur_spu_return.y_start = cur_spu_return.y_end = 0;
-			}
-
-			ddvd_lbb_changed = 0;
-			draw_osd = 1;
+			else // if (cur_spu_return.force_hide == SPU_HIDE)
+				Debug(2, "Weird: SPU_HIDE as base SPU type. Expect this only as part of a SPU_SHOW packet!!!\n");
 		}
 
 		// highlight/button handling
