@@ -2063,8 +2063,6 @@ send_message:
 			int y_source = ddvd_have_ntsc ? 480 : 576; // correct ntsc overlay
 			int x_offset = calc_x_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
 			int y_offset = calc_y_scale_offset(dvd_aspect, tv_mode, tv_mode2, tv_aspect);
-
-			//uint64_t start = ddvd_get_time(); // only to print resize stats later on
 			int resized = 0;
 
 			if ((x_offset != 0 || y_offset != 0 || y_source != ddvd_screeninfo_yres ||
@@ -2073,10 +2071,12 @@ send_message:
 				// on 4bpp mode we use bicubic resize for sd skins because we get much better results
 				// with subtitles and the speed is ok for hd skins we use nearest neighbor resize because
 				// upscaling to hd is too slow with bicubic resize
+				//uint64_t start = ddvd_get_time(); // only to print resize stats later on
 				resized = 1;
 				blit_area = ddvd_resize_pixmap(ddvd_lbb2, 720, y_source, ddvd_screeninfo_xres, ddvd_screeninfo_yres,
 												x_offset, y_offset, blit_area.x_start, blit_area.x_end,
-												blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp); // resize
+												blit_area.y_start, blit_area.y_end, ddvd_screeninfo_bypp);
+				//Debug(4, "needed time for resizing: %d ms\n", (int)(ddvd_get_time() - start));
 				Debug(4, "resized to: %dx%d %dx%d\n", blit_area.x_start, blit_area.y_start, blit_area.x_end, blit_area.y_end);
 			}
 
@@ -2094,8 +2094,6 @@ send_message:
 			}
 			memcpy(p_lfb, ddvd_lbb2, ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp); //copy backbuffer into screen
 			Debug(4, "fill p_lfb from ddvd_lbb2, backbuffer with new button/subtitle\n");
-			//Debug(1, "needed time for resizing: %d ms\n",(int)(ddvd_get_time()-start));
-			//Debug(1, "destination area to blit: %d %d %d %d\n",blit_area.x_start,blit_area.x_end,blit_area.y_start,blit_area.y_end);
 			int msg_old = msg;	// save and restore msg it may not be empty
 			msg = DDVD_SCREEN_UPDATE;
 			safe_write(message_pipe, &msg, sizeof(int));
