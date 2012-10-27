@@ -1087,22 +1087,16 @@ send_message:
 				ddvd_iframesend = -1;
 			}
 			// wait timer
-			if (ddvd_wait_timer_active) {
-				if (now >= ddvd_wait_timer_end) {
-					ddvd_wait_timer_active = 0;
-					dvdnav_still_skip(dvdnav);
-					Debug(1, "wait timer done\n");
-				}
+			if (ddvd_wait_timer_active && now >= ddvd_wait_timer_end) {
+				ddvd_wait_timer_active = 0;
+				dvdnav_still_skip(dvdnav);
+				Debug(1, "wait timer done\n");
 			}
 			// SPU timer
-			if (ddvd_spu_timer_active) {
-				if (now >= ddvd_spu_timer_end) {
-					ddvd_spu_timer_active = 0;
-						/* the last_spu bbox is still filled with the correct value, no need to blit full screen */
-						/* TODO: only clear part of backbuffer */
-					Debug(3, "    set clear SPU backbuffer, SPU finished\n");
-					ddvd_clear_screen = 1;
-				}
+			if (ddvd_spu_timer_active && now >= ddvd_spu_timer_end) {
+				ddvd_spu_timer_active = 0;
+				Debug(3, "    set clear SPU backbuffer, SPU finished\n");
+				ddvd_clear_screen = 1;
 			}
 
 			switch (event) {
@@ -1657,7 +1651,7 @@ send_message:
 				dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
 				Debug(2, "DVDNAV_HIGHLIGHT vpts=%llu pts=%llu highlight=%d button=%d mode=%d, bpts=%u%s\n", vpts, pts, have_highlight, hl->buttonN, hl->display, hl->pts,
 						(highlight_event.buttonN == hl->buttonN && highlight_event.pts == hl->pts) ?  " -- probably same as previous" : "");
-				memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));;
+				memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));
 				have_highlight = 1;
 				break;
 
