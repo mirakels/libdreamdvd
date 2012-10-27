@@ -1968,45 +1968,36 @@ send_message:
 
 		// highlight/button handling
 		if (in_menu && have_highlight) {
+			Debug(3, "HIGHLIGHT DRAW Selected button=%d mode=%d, bpts=%u vpts=%llu pts=%llu\n", highlight_event.buttonN, highlight_event.display, highlight_event.pts, vpts, pts);
+			dvdnav_highlight_area_t hl;
 			have_highlight = 0;
 			ddvd_wait_highlight = 0; // no need to hold 'wait_for_user' any longer
-			Debug(3, "HIGHLIGHT DRAW Selected button=%d mode=%d, bpts=%u vpts=%llu pts=%llu\n", highlight_event.buttonN, highlight_event.display, highlight_event.pts, vpts, pts);
-
 			ddvd_clear_screen = 1;
-
 			blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
-			dvdnav_highlight_area_t hl;
-			int libdvdnav_workaround = 0;
 
+			btni_t *btni = NULL;
 			if (pci->hli.hl_gi.btngr_ns) {
 				Debug(3, "DOBUTTON %d data from buttongroup\n", highlight_event.buttonN);
 				int btns_per_group = 36 / pci->hli.hl_gi.btngr_ns;
-				btni_t *btni = NULL;
 				int modeMask = 1 << tv_scale;
 
-				if (!btni && pci->hli.hl_gi.btngr_ns >= 1 && (pci->hli.hl_gi.btngr1_dsp_ty & modeMask))
+				if (     pci->hli.hl_gi.btngr_ns >= 1 && (pci->hli.hl_gi.btngr1_dsp_ty & modeMask))
 					btni = &pci->hli.btnit[0 * btns_per_group + highlight_event.buttonN - 1];
-				if (!btni && pci->hli.hl_gi.btngr_ns >= 2 && (pci->hli.hl_gi.btngr2_dsp_ty & modeMask))
+				else if (pci->hli.hl_gi.btngr_ns >= 2 && (pci->hli.hl_gi.btngr2_dsp_ty & modeMask))
 					btni = &pci->hli.btnit[1 * btns_per_group + highlight_event.buttonN - 1];
-				if (!btni && pci->hli.hl_gi.btngr_ns >= 3 && (pci->hli.hl_gi.btngr3_dsp_ty & modeMask))
+				else if (pci->hli.hl_gi.btngr_ns >= 3 && (pci->hli.hl_gi.btngr3_dsp_ty & modeMask))
 					btni = &pci->hli.btnit[2 * btns_per_group + highlight_event.buttonN - 1];
-
-				if (btni && btni->btn_coln != 0) {
-					hl.palette = pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0];
-					hl.sy = btni->y_start;
-					hl.ey = btni->y_end;
-					hl.sx = btni->x_start;
-					hl.ex = btni->x_end;
-					libdvdnav_workaround = 1;
-				}
+				else
+					btni = &pci->hli.btnit[highlight_event.buttonN - 1];
 			}
-			if (!libdvdnav_workaround && dvdnav_get_highlight_area(pci, highlight_event.buttonN, 0, &hl) == DVDNAV_STATUS_OK) {
-				Debug(3, "DOBUTTON %d data from highlight area\n", highlight_event.buttonN);
-				libdvdnav_workaround = 1;
-			}
-
-			if (libdvdnav_workaround) {
+			if (btni) {
 				Debug(3, "DOBUTTON btni\n");
+				hl.palette = btni->btn_coln == 0 ? 0 : pci->hli.btn_colit.btn_coli[btni->btn_coln - 1][0];
+				hl.sy = btni->y_start;
+				hl.ey = btni->y_end;
+				hl.sx = btni->x_start;
+				hl.ex = btni->x_end;
+
 				// get and set clut for actual button
 				int i;
 				if (ddvd_screeninfo_bypp == 1) {
@@ -2052,7 +2043,7 @@ send_message:
 						blit_area.x_end, blit_area.y_end);
 			}
 			else {
-				Debug(3, "DOBUTTON libdvdnav_workaround=0 - no drawing!\n");
+				Debug(3, "DOBUTTON no info - no drawing!\n");
 				draw_osd = 0;
 			}
 		}
