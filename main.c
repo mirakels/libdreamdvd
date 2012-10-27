@@ -946,6 +946,8 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int reached_sof = 0;
 	uint64_t now;
 	int in_menu = 0;
+	dvdnav_still_event_t still_event;
+	int have_still_event;
 
 	while (!finished) {
 		pci_t *pci = 0;
@@ -1518,24 +1520,16 @@ send_message:
 				break;
 
 			case DVDNAV_STILL_FRAME:
-				/* We have reached a still frame. So we start a timer to wait
-				 * the amount of time specified by the still's length while still handling
-				 * user input to make menus and other interactive stills work.
-				 * A length of 0xff means an indefinite still which has to be skipped
-				 * indirectly by some user interaction. */
 				if (ddvd_iframesend == 0 && ddvd_last_iframe_len)
 					ddvd_iframesend = 1;
 
-				dvdnav_still_event_t *still_event = (dvdnav_still_event_t *) buf;
-				if (still_event->length < 0xff) {
-					if (!ddvd_wait_timer_active) {
-						ddvd_wait_timer_active = 1;
-						ddvd_wait_timer_end = now + still_event->length * 1000;	//ms
-					}
+				if (!ddvd_wait_timer_active && !have_still_event) {
+					// Save the still event so it can be processed when it is really time to be displayed!
+					// Need only to do so when no wait timer is active!
+					memcpy(&still_event, buf, sizeof(dvdnav_still_event_t));
+					have_still_event = 1;
+					Debug(4, "DVDNAV_STILL_FRAME: lenght=%d vpts=%llu pts=%llu\n", still_event.length, vpts, pts);
 				}
-				else
-					ddvd_wait_for_user = 1;
-				Debug(4, "DVDNAV_STILL_FRAME: lenght=%d vpts=%llu pts=%llu\n", still_event->length, vpts, pts);
 				break;
 
 			case DVDNAV_WAIT:
@@ -1871,6 +1865,24 @@ send_message:
 		// pts+10 to avoid decoder time rounding errors. Seen vpts=11555 and pts=11554 ...
 		signed long long spudiff = pts+10 - spupts;
 #endif
+		if (have_still_event && ddvd_iframesend <= 0 && abs(vpts - pts) < 10) {
+			/* It seems stills have a separate vpts (e.g. starting from 0 again, or a separate PGC)
+			 * Reached the time for a still frame. Start a timer to wait the amount of time specified by the
+			 * still's length while still handling user input to make menus and other interactive stills work.
+			 * A length of 0xff means an indefinite still which has to be skipped indirectly by some user interaction.
+			 */
+			if (!ddvd_wait_timer_active)
+				Debug(2, "DVDNAV_STILL_FRAME: activate: length=%d vpts=%llu pts=%llu\n", still_event.length, vpts, pts);
+			if (still_event.length < 0xff) {
+				if (!ddvd_wait_timer_active) {
+					ddvd_wait_timer_active = 1;
+					ddvd_wait_timer_end = now + still_event.length * 1000; //ms
+				}
+			}
+			else
+				ddvd_wait_for_user = 1;
+			have_still_event = 0;
+		}
 		/*
 		 * When vpts > pts we are still in a normal stream so check on spudif is enough.
 		 * But when vpts < pts, libdvdnav already is working on a new video fragment (PGC) possible sending out PSU.
