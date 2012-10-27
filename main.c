@@ -2765,22 +2765,22 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 
 	while (i < size && buffer[i] != 0xFF) {
 		switch (buffer[i]) {
-			case 0x00:	/* force */
-				force_hide = SPU_FORCE;
+			case 0x00:	// force
+				force_hide = SPU_FORCE; // Highlight mask SPU
 				Debug(4, "force\n");
 				i++;
 				break;
-			case 0x01:	/* show */
-				force_hide = SPU_SHOW;
+			case 0x01:	// show
+				force_hide = SPU_SHOW; // Subtitle SPU
 				Debug(4, "show\n");
 				i++;
 				break;
-			case 0x02:	/* hide */
-				force_hide = SPU_HIDE;
+			case 0x02:	// hide
+				force_hide = SPU_HIDE; // Probably only as second control block in Subtitle SPU. See scan for display_time below
 				Debug(4, "hide\n");
 				i++;
 				break;
-			case 0x03:	/* palette */
+			case 0x03:	// palette
 			{
 				ddvd_spudec_clut_t *clut = (ddvd_spudec_clut_t *) (buffer + i + 1);
 				Debug(4, "update palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
@@ -2804,7 +2804,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 				i += 3;
 				break;
 			}
-			case 0x04:	/* transparency palette */
+			case 0x04:	// transparency palette
 			{
 				ddvd_spudec_clut_t *clut = (ddvd_spudec_clut_t *) (buffer + i + 1);
 				Debug(4, "update transp palette %d %d %d %d\n", clut->entry0, clut->entry1, clut->entry2, clut->entry3);
@@ -2817,7 +2817,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 				i += 3;
 				break;
 			}
-			case 0x05:	/* image coordinates */
+			case 0x05:	// image coordinates
 				xspu = x1spu = (((unsigned int)buffer[i + 1]) << 4) + (buffer[i + 2] >> 4);
 				yspu = y1spu = (((unsigned int)buffer[i + 4]) << 4) + (buffer[i + 5] >> 4);
 				x2spu = (((buffer[i + 2] & 0x0f) << 8) + buffer[i + 3]);
@@ -2825,13 +2825,13 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 				Debug(4, "image coords: %dx%d,%dx%d\n", xspu, yspu, x2spu, y2spu);
 				i += 7;
 				break;
-			case 0x06:	/* image 1 / image 2 offsets */
+			case 0x06:	// image 1 / image 2 offsets
 				offset[0] = (((unsigned int)buffer[i + 1]) << 8) + buffer[i + 2];
 				offset[1] = (((unsigned int)buffer[i + 3]) << 8) + buffer[i + 4];
 				Debug(4, "image offsets %x,%x\n", offset[0], offset[1]);
 				i += 5;
 				break;
-			case 0x07:	/* change color for a special area so overlays with more than 4 colors are possible - NOT IMPLEMENTET YET */
+			case 0x07:	// change color for a special area so overlays with more than 4 colors are possible - NOT IMPLEMENTET YET
 				Debug(4, "change color packet - not implemented\n");
 				param_len = (buffer[i + 1] << 8 | buffer[i + 2]);
 				i += param_len + 1;
@@ -2842,7 +2842,7 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 		}
 	}
 
-	//get display time
+	// get display time - actually a plain control block
 	if (i + 6 <= size) {
 		if (buffer[i + 5] == 0x02 && buffer[i + 6] == 0xFF) {
 			display_time = ((buffer[i + 1] << 8) + buffer[i + 2]);
@@ -2860,17 +2860,17 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 		u_int code;
 
 		code = (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
-		aligned = aligned ? 0 : 1;
+		aligned ^= 1;
 
 		if (code < 0x0004) {
 			code = (code << 4) | (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
-			aligned = aligned ? 0 : 1;
+			aligned ^= 1;
 			if (code < 0x0010) {
 				code = (code << 4) | (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
-				aligned = aligned ? 0 : 1;
+				aligned ^= 1;
 				if (code < 0x0040) {
 					code = (code << 4) | (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
-					aligned = aligned ? 0 : 1;
+					aligned ^= 1;
 				}
 			}
 		}
@@ -2880,16 +2880,16 @@ static struct ddvd_spu_return ddvd_spu_decode_data(char *spu_buf, const uint8_t 
 		if (len == 0)
 			len = (x2spu - xspu) + 1;
 
-		memset(spu_buf + xspu + 720 * (yspu), (code & 3) + 252, len);	//drawpixel into backbuffer
+		memset(spu_buf + xspu + 720 * (yspu), (code & 3) + 252, len);	// drawpixel into backbuffer
 		xspu += len;
 		if (xspu > x2spu) {
 			if (!aligned) {
 				code = (aligned ? (buffer[offset[id]++] >> 4) : (buffer[offset[id] - 1] & 0xF));
 				aligned = aligned ? 0 : 1;
 			}
-			xspu = x1spu;	//next line
+			xspu = x1spu;	// next line
 			yspu++;
-			id = id ? 0 : 1;
+			id ^= 1;
 		}
 	}
 	struct ddvd_spu_return return_code;
