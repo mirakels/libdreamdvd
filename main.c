@@ -1647,13 +1647,15 @@ send_message:
 				break;
 
 			case DVDNAV_HIGHLIGHT:
-				/* Prepare to display some Buttons */
-				dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
-				Debug(2, "DVDNAV_HIGHLIGHT vpts=%llu pts=%llu highlight=%d button=%d mode=%d, bpts=%u%s\n", vpts, pts, have_highlight, hl->buttonN, hl->display, hl->pts,
-						(highlight_event.buttonN == hl->buttonN && highlight_event.pts == hl->pts) ?  " -- probably same as previous" : "");
-				memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));
-				have_highlight = 1;
-				break;
+				{
+					/* Prepare to display some Buttons */
+					dvdnav_highlight_event_t * hl = (dvdnav_highlight_event_t *) buf;
+					Debug(2, "DVDNAV_HIGHLIGHT vpts=%llu pts=%llu highlight=%d button=%d mode=%d, bpts=%u%s\n", vpts, pts, have_highlight, hl->buttonN, hl->display, hl->pts,
+							(highlight_event.buttonN == hl->buttonN && highlight_event.pts == hl->pts) ?  " -- probably same as previous" : "");
+					memcpy(&highlight_event, buf, sizeof(dvdnav_highlight_event_t));
+					have_highlight = 1;
+					break;
+				}
 
 			case DVDNAV_VTS_CHANGE:
 				{
