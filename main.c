@@ -2537,16 +2537,11 @@ err_dvdnav:
 		Debug(1, "Error on dvdnav_close: %s\n", dvdnav_err_to_string(dvdnav));
 
 err_dvdnav_open:
-	if (ioctl(ddvd_fdvideo, VIDEO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: VIDEO_CLEAR_BUFFER");
+	ddvd_device_clear();
 	if (ioctl(ddvd_fdvideo, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_DEMUX) < 0)
 		perror("LIBDVD: VIDEO_SELECT_SOURCE");
-	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_DEMUX) < 0)
 		perror("LIBDVD: AUDIO_SELECT_SOURCE");
-	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)	// restore AudioDecoder State
-		perror("LIBDVD: AUDIO_SET_AV_SYNC");
 	close(ddvd_ac3_fd);
 err_open_ac3_fd:
 	close(ddvd_fdaudio);
