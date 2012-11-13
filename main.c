@@ -1662,7 +1662,7 @@ send_message:
 					for ( i = 0; i < MAX_AUDIO; i++)
 						playerconfig->audio_format[i] = -1;
 					// fill spu_map with data
-					int count_tmp,spu_tmp;
+					int count_tmp, spu_tmp, wanted_spu = -1;;
 					for (count_tmp = 0; count_tmp < MAX_SPU; count_tmp++)
 						playerconfig->spu_map[count_tmp] = -1;
 					for (count_tmp = 0; count_tmp < MAX_SPU; count_tmp++) {
@@ -1670,6 +1670,8 @@ send_message:
 						if (spu_tmp >= 0 && spu_tmp < MAX_SPU) {
 							playerconfig->spu_map[spu_tmp] = count_tmp;
 							int lang = dvdnav_spu_stream_to_lang(dvdnav, count_tmp);
+							if (wanted_spu == -1 && (lang >> 8) == playerconfig->language[0] && (lang & 0xff) == playerconfig->language[1])
+								wanted_spu = count_tmp;
 							Debug(2, "    MPEG spu stream %d -> logical stream %d - %04X %c%c\n", spu_tmp, count_tmp, lang,
 										lang == 0xFFFF ? 'N' : lang >> 8, 
 										lang == 0xFFFF ? 'A' : lang & 0xFF);
@@ -1679,7 +1681,14 @@ send_message:
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
 					tv_scale = ddvd_check_aspect(dvd_aspect, dvd_scale_perm, tv_aspect, tv_mode);
-					Debug(3, "    DVD Aspect: %d TV Aspect: %d Scale: %d Allowed: %d TV mode: %d\n", dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode);
+					if (wanted_spu != -1) {
+						// dvdnav_spu_language_select(dvdnav, playerconfig->language); // just try
+						spu_active_id = dvdnav_get_spu_logical_stream(dvdnav, wanted_spu);
+						spu_lock = 1;
+						Debug(3, "    Try setting SPU to logical_id %d %s 0> spu_active=%d\n", wanted_spu, playerconfig->language, spu_active_id);
+					}
+					Debug(3, "    DVD Aspect: %d TV Aspect: %d TV Scale: %d Allowed: %d TV Mode: %d, wanted langage: %c%c\n",
+dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode, playerconfig->language[0], playerconfig->language[1]);
 
 					// resuming a dvd ?
 					if (playerconfig->should_resume && first_vts_change) {
