@@ -956,7 +956,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 		/* the main reading function */
 		now = ddvd_get_time();
-		if (ddvd_playmode == PLAY) {	//skip when not in play mode
+		if (ddvd_playmode & PLAY) {	//skip when not in play mode
 			// trickmode
 			if (ddvd_trickmode & (TRICKFW | TRICKBW) && now >= ddvd_trick_timer_end) {
 				uint32_t pos, len;
@@ -2153,7 +2153,7 @@ send_message:
 
 		//Userinput
 		if (ddvd_wait_for_user && !ddvd_wait_highlight) {
-			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu\n", ddvd_playmode == PAUSE ? "" : "not ", vpts, pts);
+			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu\n", ddvd_playmode & PAUSE ? "" : "not ", vpts, pts);
 			struct pollfd pfd[1];	// make new pollfd array
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
@@ -2183,8 +2183,8 @@ send_message:
 					keydone = 0;
 					break;
 			}
-			if (ddvd_playmode == PAUSE) {
-				switch (rccode) {       //Actions in PAUZE mode. Only play, pause and exit have visible effects...
+			if (ddvd_playmode & PAUSE) {
+				switch (rccode) {       //Actions in PAUSE mode. Only play, pause and exit have visible effects...
 					case DDVD_KEY_PLAY:
 					case DDVD_KEY_PAUSE:
 					case DDVD_KEY_EXIT:
@@ -2303,8 +2303,8 @@ send_message:
 					}
 					case DDVD_KEY_PAUSE:	// Pause
 					{
-						Debug(3, "DDVD_KEY_PAUSE on %s\n", ddvd_playmode == PLAY ? "play" : "pause");
-						if (ddvd_playmode == PLAY) {
+						Debug(3, "DDVD_KEY_PAUSE on %s\n", ddvd_playmode & PLAY ? "play" : "pause");
+						if (ddvd_playmode == PLAY) { // no bitfield check, need real pause here
 							ddvd_playmode = PAUSE;
 							if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
 								perror("LIBDVD: AUDIO_PAUSE");
@@ -2315,15 +2315,15 @@ send_message:
 							ddvd_wait_for_user = 1; // don't waste cpu during pause
 							break;
 						}
-						else if (ddvd_playmode != PAUSE)
+						else if (ddvd_playmode != PAUSE) // no bitfield check, need may be play+pause
 							break;
 						// fall through to PLAY
 					}
 					case DDVD_KEY_PLAY:	// Play
 					{
-						Debug(3, "DDVD_KEY_PLAY on %s\n", ddvd_playmode == PLAY ? "play" : "pause fallthrough");
-						if (ddvd_playmode == PAUSE || ddvd_trickmode != TOFF) {
-							if (ddvd_playmode == PAUSE)
+						Debug(3, "DDVD_KEY_PLAY on %s\n", ddvd_playmode & PLAY ? "play" : "pause fallthrough");
+						if (ddvd_playmode & PAUSE || ddvd_trickmode != TOFF) {
+							if (ddvd_playmode & PAUSE)
 								ddvd_wait_for_user = 0;
 							ddvd_playmode = PLAY;
 key_play:
@@ -2336,7 +2336,7 @@ key_play:
 							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 									perror("LIBDVD: AUDIO_SET_MUTE");
-							if (ddvd_playmode == PLAY || ddvd_trickmode & FASTFW) {
+							if (ddvd_playmode & PLAY || ddvd_trickmode & FASTFW) {
 								if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
 									perror("LIBDVD: AUDIO_CONTINUE");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)

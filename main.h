@@ -167,7 +167,12 @@ enum {
 
 int ddvd_trickmode,ddvd_trickspeed;
 
-enum {STOP, PLAY, PAUSE};
+enum {
+	STOP  = 0x00,
+	PLAY  = 0x01,
+	PAUSE = 0x02
+};
+
 int ddvd_playmode;
 
 int ddvd_wait_timer_active;
