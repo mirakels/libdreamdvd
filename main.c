@@ -2223,6 +2223,7 @@ send_message:
 						if (ddvd_wait_timer_active)
 							ddvd_wait_timer_active = 0;
 						dvdnav_button_activate(dvdnav, pci);
+						in_menu = 0; // expext a new SPU packet to enable menus again
 						break;
 					case DDVD_KEY_EXIT:	//Exit
 						Debug(3, "DDVD_KEY_EXIT (menu)\n");
