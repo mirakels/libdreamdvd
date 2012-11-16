@@ -161,11 +161,11 @@ enum {
 	FASTBW  = 0x02,
 	TRICKFW = 0x04,
 	TRICKBW = 0x08,
-    SLOWFW  = 0x10,
-    SLOWBW  = 0x20
+	SLOWFW  = 0x10,
+	SLOWBW  = 0x20
 };
 
-int ddvd_trickmode,ddvd_trickspeed;
+int ddvd_trickmode, ddvd_trickspeed;
 
 enum {
 	STOP  = 0x00,
