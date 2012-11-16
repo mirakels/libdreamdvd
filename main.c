@@ -947,11 +947,11 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int reached_sof = 0;
 	uint64_t now;
 	int in_menu = 0;
+	pci_t *pci = 0;
 	dvdnav_still_event_t still_event;
 	int have_still_event;
 
 	while (!finished) {
-		pci_t *pci = 0;
 		dsi_t *dsi = 0;
 		int draw_osd = 0;
 
@@ -1822,8 +1822,6 @@ send_message:
 			}
 		}
 
-		pci = dvdnav_get_current_nav_pci(dvdnav);
-
 		// spu and highlight/button handling
 		unsigned long long spupts = spu_backpts[ddvd_spu_play % NUM_SPU_BACKBUFFER];
 #if CONFIG_API_VERSION == 1
@@ -2013,6 +2011,9 @@ send_message:
 			ddvd_wait_highlight = 0; // no need to hold 'wait_for_user' any longer
 			ddvd_clear_screen = 1;
 			blit_area.x_start = blit_area.x_end = blit_area.y_start = blit_area.y_end = 0;
+
+			if (!pci) // should not happen, is set when SPU is processed
+				pci = dvdnav_get_current_nav_pci(dvdnav);
 
 			btni_t *btni = NULL;
 			if (pci->hli.hl_gi.btngr_ns) {
@@ -2246,6 +2247,8 @@ send_message:
 			}
 
 			if (!keydone && playerconfig->in_menu) {
+				if (!pci) // should not happen, is set when SPU is processed
+					pci = dvdnav_get_current_nav_pci(dvdnav);
 				switch (rccode) {	// Actions inside a Menu
 					case DDVD_KEY_UP:	//Up
 						dvdnav_upper_button_select(dvdnav, pci);
