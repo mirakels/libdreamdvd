@@ -170,7 +170,8 @@ int ddvd_trickmode,ddvd_trickspeed;
 enum {
 	STOP  = 0x00,
 	PLAY  = 0x01,
-	PAUSE = 0x02
+	PAUSE = 0x02,
+	STEP  = 0x04
 };
 
 int ddvd_playmode;

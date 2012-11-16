@@ -908,6 +908,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		playerconfig->spu_map[i] = -1;
 
 	unsigned long long vpts = 0, apts = 0, spts = 0, pts = 0;
+	unsigned long long steppts = 0; // target pts for STEP mode
 
 	audio_id = dvdnav_get_active_audio_stream(dvdnav);
 	ddvd_playmode = PLAY;
@@ -956,7 +957,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 		/* the main reading function */
 		now = ddvd_get_time();
-		if (ddvd_playmode & PLAY) {	//skip when not in play mode
+		if (ddvd_playmode & (PLAY|STEP)) {	// Skip when not in play mode
 			// trickmode
 			if (ddvd_trickmode & (TRICKFW | TRICKBW) && now >= ddvd_trick_timer_end) {
 				uint32_t pos, len;
@@ -1874,6 +1875,20 @@ dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode, playerconfig->language
 		// pts+10 to avoid decoder time rounding errors. Seen vpts=11555 and pts=11554 ...
 		signed long long spudiff = pts+10 - spupts;
 #endif
+		if (ddvd_playmode & STEP && pts > steppts) { // finish step
+			if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
+				perror("LIBDVD: AUDIO_PAUSE");
+			if (ioctl(ddvd_fdvideo, VIDEO_FREEZE) < 0)
+				perror("LIBDVD: VIDEO_FREEZE");
+			Debug(3, "STEP mode done: go to PAUSE on %lld now %lld diff %lld %d:%02d:%02d/%02d\n", steppts, pts, pts - steppts,
+					(int)(pts/90000/3600), (int)(pts/90000/60)%60, (int)(pts/90000)%60,
+					(int)((pts%90000 + 1) * playerconfig->last_framerate.framerate / 90000 / 1000));
+			ddvd_playmode = PAUSE;
+			msg = DDVD_SHOWOSD_STATE_PAUSE;
+			safe_write(message_pipe, &msg, sizeof(int));
+			ddvd_wait_for_user = 1; // don't waste cpu during pause
+		}
+
 		if (have_still_event && ddvd_iframesend <= 0 && abs(vpts - pts) < 10) {
 			/* It seems stills have a separate vpts (e.g. starting from 0 again, or a separate PGC)
 			 * Reached the time for a still frame. Start a timer to wait the amount of time specified by the
@@ -2193,11 +2208,28 @@ dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode, playerconfig->language
 					break;
 			}
 			if (ddvd_playmode & PAUSE) {
-				switch (rccode) {       //Actions in PAUSE mode. Only play, pause and exit have visible effects...
+				switch (rccode) {       // Actions in PAUSE mode.
 					case DDVD_KEY_PLAY:
 					case DDVD_KEY_PAUSE:
 					case DDVD_KEY_EXIT:
 					case DDVD_KEY_OK:
+						break;
+					case DDVD_KEY_UP:
+					case DDVD_KEY_DOWN:
+					case DDVD_KEY_PREV_CHAPTER: // <
+					case DDVD_KEY_NEXT_CHAPTER: // >
+						// Unpause for a while (two to three frames) and pause again
+						steppts = pts + 90000000 / playerconfig->last_framerate.framerate  - 10;
+						Debug(3, "STEP mode on. play till %lld now %lld\n", steppts, pts);
+						msg = DDVD_SHOWOSD_STATE_PLAY;
+						safe_write(message_pipe, &msg, sizeof(int));
+						ddvd_wait_for_user = 0;
+						ddvd_playmode |= STEP;
+						keydone = 1;
+						if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
+							perror("LIBDVD: AUDIO_CONTINUE");
+						if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+							perror("LIBDVD: VIDEO_CONTINUE");
 						break;
 					case DDVD_SKIP_FWD:
 					case DDVD_SKIP_BWD:
@@ -2258,8 +2290,8 @@ dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode, playerconfig->language
 			else if (!keydone) {	//Actions inside a Movie
 				switch (rccode) {	//Main Actions
 					case DDVD_SET_CHAPTER:
-					case DDVD_KEY_PREV_CHAPTER:	//left
-					case DDVD_KEY_NEXT_CHAPTER:	//right
+					case DDVD_KEY_PREV_CHAPTER:	// <
+					case DDVD_KEY_NEXT_CHAPTER:	// >
 					case DDVD_KEY_LEFT:
 					case DDVD_KEY_RIGHT:
 					{
