@@ -2186,6 +2186,8 @@ send_message:
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
 			poll(pfd, 1, -1);
+			if (!(ddvd_playmode & PAUSE)) // start looping again
+				ddvd_wait_for_user = 0;
 		}
 		if (ddvd_readpipe(key_pipe, &rccode, sizeof(int), 0) == sizeof(int)) {
 			int keydone = 1;
