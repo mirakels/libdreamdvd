@@ -928,9 +928,23 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 	playerconfig->in_menu = 0;
 
-	const char *dvd_titlestring;
+	const char *dvd_titlestring = NULL;
 	if (dvdnav_get_title_string(dvdnav, &dvd_titlestring) == DVDNAV_STATUS_OK)
-		strcpy(playerconfig->title_string, dvd_titlestring);
+		strncpy(playerconfig->title_string, dvd_titlestring, 96);
+	if (strlen(playerconfig->title_string) == 0) {
+		// DVD has no title set,, use dvd_path info
+		char *sl = strrchr(playerconfig->dvd_path, '/');
+		if (sl == NULL)
+			sl = playerconfig->dvd_path;
+		else
+			sl++;
+		strncpy(playerconfig->title_string, sl, 96);
+		sl = playerconfig->title_string;
+		int len = strlen(sl);
+		if (sl[len - 4] == '.' && sl[len - 3] == 'i' && sl[len - 2] == 's' && sl[len - 1] == '0')
+			sl[len - 4] = '\0';
+	}
+	Debug(1, "DVD Title: %s\n", playerconfig->title_string);
 
 	msg = DDVD_SHOWOSD_TITLESTRING;
 	safe_write(message_pipe, &msg, sizeof(int));
