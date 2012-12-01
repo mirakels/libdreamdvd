@@ -206,6 +206,12 @@ struct ddvd_progressive_evt {
 	int progressive;
 };
 
+/* struct to maintain subtitle stream info */
+struct spu_map_t {
+	int8_t logical_id	:  8;
+	int8_t stream_id	:  8;
+	int16_t lang		: 16;
+};
 
 /* struct for ddvd nav handle*/
 struct ddvd {
@@ -256,7 +262,7 @@ struct ddvd {
 	int angle_num;
 
 	int audio_format[MAX_AUDIO];
-	int spu_map[MAX_SPU];
+	struct spu_map_t spu_map[MAX_SPU];
 };
 
 /* internal functions */
