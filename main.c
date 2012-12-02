@@ -964,7 +964,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int reached_sof = 0;
 	uint64_t now;
 	int in_menu = 0;
-	pci_t *pci = 0;
+	pci_t *pci = NULL;
 	dvdnav_still_event_t still_event;
 	int have_still_event;
 
@@ -2201,7 +2201,7 @@ send_message:
 
 		//Userinput
 		if (ddvd_wait_for_user && !ddvd_wait_highlight) {
-			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu\n", ddvd_playmode & PAUSE ? "" : "not ", vpts, pts);
+			Debug(3, "Waiting for keypress - %spaused, vpts=%llu pts=%llu menu=%d playermenu=%d\n", ddvd_playmode & PAUSE ? "" : "not ", vpts, pts, in_menu, playerconfig->in_menu);
 			struct pollfd pfd[1];	// Make new pollfd array
 			pfd[0].fd = key_pipe;
 			pfd[0].events = POLLIN | POLLPRI | POLLERR;
@@ -2249,7 +2249,7 @@ send_message:
 						msg = DDVD_SHOWOSD_STATE_PLAY;
 						safe_write(message_pipe, &msg, sizeof(int));
 						ddvd_wait_for_user = 0;
-						ddvd_playmode |= STEP;
+						ddvd_playmode = STEP;
 						keydone = 1;
 						if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
 							perror("LIBDVD: AUDIO_CONTINUE");
@@ -2269,7 +2269,7 @@ send_message:
 			}
 
 			if (!keydone && playerconfig->in_menu) {
-				if (!pci) // should not happen, is set when SPU is processed
+				if (!pci) // should not happen! Must be set when SPU is processed
 					pci = dvdnav_get_current_nav_pci(dvdnav);
 				switch (rccode) {	// Actions inside a Menu
 					case DDVD_KEY_UP:	//Up
@@ -2399,9 +2399,11 @@ key_play:
 #if CONFIG_API_VERSION == 1
 							ddvd_device_clear();
 #endif
-							if (ddvd_trickmode & (FASTFW|FASTBW))
+							if (ddvd_trickmode & (FASTFW|FASTBW)) {
+								Debug(3, "DDVD_KEY_PLAY reset fast forward\n");
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
 									perror("LIBDVD: VIDEO_FAST_FORWARD");
+							}
 							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 									perror("LIBDVD: AUDIO_SET_MUTE");
@@ -2458,7 +2460,7 @@ key_play:
 						else if (ddvd_trickspeed < 64)
 							ddvd_trickspeed *= 2;
 
-						Debug(3, "%s speed %dx\n", ddvd_trickmode & (TRICKFW|FASTFW) ? "forward" : "backward", ddvd_trickspeed);
+						Debug(3, "FAST%cWD speed %dx\n", ddvd_trickmode & (TRICKFW|FASTFW) ? 'F' : 'B', ddvd_trickspeed);
 						if (ddvd_trickmode & (TRICKFW|FASTFW)) {
 							if (ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
 								ddvd_trickmode = FASTFW; // Driver fast forward
