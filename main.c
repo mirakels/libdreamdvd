@@ -1396,22 +1396,19 @@ send_message:
 					else if ((buf[14 + 3]) == 0xBD && (buf[14 + buf[14 + 8] + 9]) == 0x80 + audio_id) {	// ac3 audio
 						if (audio_type != DDVD_AC3) {
 							//Debug(1, "Switch to AC3 Audio\n");
-							if (ac3thru || !have_liba52) {	// !have_liba52 and !ac3thru should never happen, but who knows ;)
-								if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-									perror("LIBDVD: AUDIO_SET_AV_SYNC");
+							int bypassmode;
+							if (ac3thru || !have_liba52) // !have_liba52 and !ac3thru should never happen, but who knows ;)
 #ifdef CONVERT_TO_DVB_COMPLIANT_AC3
-								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 0) < 0)	// AC3 (dvb compliant)
+								bypassmode = 0;
 #else
-								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 3) < 0)	// AC3 VOB
+								bypassmode = 3;
 #endif
+							else
+								bypassmode = 1;
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
+								perror("LIBDVD: AUDIO_SET_AV_SYNC");
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, bypassmode) < 0)
 									perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
-							}
-							else {
-								if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-									perror("LIBDVD: AUDIO_SET_AV_SYNC");
-								if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-									perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
-							}
 							audio_type = DDVD_AC3;
 						}
 
