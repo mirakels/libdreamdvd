@@ -2485,7 +2485,7 @@ key_play:
 					{
 						int skip;
 						ddvd_readpipe(key_pipe, &skip, sizeof(int), 1);
-						if (ddvd_trickmode == TOFF) {
+						if (ddvd_trickmode != (TRICKFW|TRICKBW)) {
 							uint32_t pos, len;
 							dvdnav_get_position(dvdnav, &pos, &len);
 							// 90000 = 1 Sek.
