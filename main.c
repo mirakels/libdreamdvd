@@ -2244,7 +2244,7 @@ send_message:
 					case DDVD_KEY_PREV_CHAPTER: // <
 					case DDVD_KEY_NEXT_CHAPTER: // >
 						// Unpause for a while (two to three frames) and pause again
-						steppts = pts + 90000000 / playerconfig->last_framerate.framerate  - 10;
+						steppts = pts;
 						Debug(3, "STEP mode on. play till %lld now %lld\n", steppts, pts);
 						msg = DDVD_SHOWOSD_STATE_PLAY;
 						safe_write(message_pipe, &msg, sizeof(int));
