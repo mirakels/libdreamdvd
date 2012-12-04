@@ -7,33 +7,45 @@ access to the original repository. And because the server for the
 original repo does not always seem to be online I decided to make
 clone on github.
 
-The changes mainly optimize menu handling and subtitle display.
-The issue is that menu buttons are often displayed way to often
-and sometimes do not appear or seem to display repeatedly giving a
-stroboscope effect. Sometimes subtitles are displayed to early. The
-reaseon for most of this is that audio/video handling is handled by
-hardware that uses caching/buffers creating delays. Menus and subtitles
-are on OSD which is taken care of by the libdreamdvd libray itself.
-Synchronizing OSD display with the hardware delays is a hassle...
+The changes started mainly to optimize menu handling and subtitle
+display.  The issue is that menu buttons are often displayed way
+to often and sometimes do not appear or seem to display repeatedly
+giving a stroboscope effect. Sometimes subtitles are displayed to
+early. The reaseon for most of this is that audio/video handling
+is handled by hardware that uses caching/buffers creating delays.
+Menus and subtitles are on OSD which is taken care of by the
+libdreamdvd library itself.  Synchronizing OSD display with the
+hardware delays is a hassle...
 
-Also the 'resume' function did not work.
+Gradually many many other changes took place making the library
+a bit bigger but with improved functionality, stability,
+readability and debugability.
 
-Finally many cosmetic changes, small bug fixes and refactored code
-to remove duplicate code and make things more clear.
+Finally many cosmetic changes, small bug fixes and refactored
+code to remove duplicate code and make things more clear.
 
 The current status is
-- resume function works again
-- menu buttons have less stroboscope effect and now always
+- Resume function works again
+- Menu buttons have less stroboscope effect and now always
   show correctly (99%) but still are shown to soon sometimes.
-- subtitle still may be displayed to soon.
+- Subtitle delays more or less fixed, but still may be to
+  soon in rare situations
+- Implemented frame step mode: up/down keys while in pause
+  mode (actually steps are a few frames)
+- Implemented slow motion: fast forward/backward keys while
+  in pause mode.
+- Smooth fastforward mode for speed up to 6x.
 
-I have code that mostly fixes buttons/subtitle sync with the
-video output but it still fails sometimes or result in problems
-displaying the wrong video data when navigating through menus.
+The slow motion (and a new fast forward/backward) implementation
+require changes to enigma2.
 
-So... usable but work in progress
+At this time the code seems quite stable but as always: use
+at your own risk. Part of the code is very much spagetti code
+that needs to be revised some day. It mainly concerns maintaining
+the playmode and trickmode states and programming the video
+driver for this.
 
-Any comments hints patches are welcome
+~comments hints patches are welcome!
 
 -Mirakels
 mirakels@users.sourceforge.net
