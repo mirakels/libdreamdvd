@@ -2256,6 +2256,8 @@ send_message:
 						if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
 							perror("LIBDVD: VIDEO_CONTINUE");
 						break;
+					case DDVD_KEY_FASTFWD:
+					case DDVD_KEY_FASTBWD:
 					case DDVD_SKIP_FWD:
 					case DDVD_SKIP_BWD:
 					case DDVD_SET_TITLE:
@@ -2451,6 +2453,40 @@ key_play:
 						finished = 1;
 						break;
 					}
+					case DDVD_KEY_FASTFWD:
+					case DDVD_KEY_FASTBWD:
+						ddvd_readpipe(key_pipe, &ddvd_trickspeed, sizeof(int), 1);
+						Debug(3, "FAST%cWD speed %dx\n", ddvd_trickmode & (TRICKFW|FASTFW) ? 'F' : 'B', ddvd_trickspeed);
+						if (ddvd_trickspeed == 0)
+							goto key_play;
+						if (!(ddvd_trickmode & (FASTFW|FASTBW|TRICKFW|TRICKBW))) {
+							if (ddvd_trickmode & (SLOWFW|SLOWBW)) {
+								if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
+									perror("LIBDVD: VIDEO_SLOWMOTION");
+							}
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
+								perror("LIBDVD: AUDIO_SET_MUTE");
+						}
+						// determine if flip to/from driver (smooth) or trick fast forward
+						if (ddvd_trickspeed > 0 && ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
+							ddvd_trickmode = FASTFW;
+							if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, ddvd_trickspeed) < 0)
+								perror("LIBDVD: VIDEO_FAST_FORWARD");
+							if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+								perror("LIBDVD: VIDEO_CONTINUE");
+						}
+						else {
+							if (ddvd_trickmode & FASTFW) {
+								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0) < 0)
+									perror("LIBDVD: VIDEO_FAST_FORWARD");
+								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+									perror("LIBDVD: VIDEO_CONTINUE");
+							}
+							ddvd_trickmode = (ddvd_trickspeed < 0 ? TRICKBW : TRICKFW);
+						}
+						Debug(3, "FAST%cWD speed %dx\n", ddvd_trickmode & (TRICKFW|FASTFW) ? 'F' : 'B', ddvd_trickspeed);
+						msg = ddvd_trickmode & (TRICKBW|FASTBW) ? DDVD_SHOWOSD_STATE_FBWD : DDVD_SHOWOSD_STATE_FFWD;
+						break;
 					case DDVD_KEY_FFWD:	//FastForward
 					case DDVD_KEY_FBWD:	//FastBackward
 					{
