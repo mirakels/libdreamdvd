@@ -2238,6 +2238,8 @@ send_message:
 					case DDVD_KEY_PAUSE:
 					case DDVD_KEY_EXIT:
 					case DDVD_KEY_OK:
+					case DDVD_KEY_SLOWFWD:
+					case DDVD_KEY_SLOWBWD:
 						break;
 					case DDVD_KEY_UP:
 					case DDVD_KEY_DOWN:
@@ -2385,6 +2387,9 @@ send_message:
 								if (ddvd_trickmode & (FASTFW|FASTBW))
 									if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
 										perror("LIBDVD: VIDEO_FAST_FORWARD");
+								if (ddvd_trickmode & (SLOWFW|SLOWBW))
+									if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
+										perror("LIBDVD: VIDEO_SLOWMOTION");
 								if (!ismute)
 									if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 										perror("LIBDVD: AUDIO_SET_MUTE");
@@ -2416,10 +2421,16 @@ key_play:
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
 									perror("LIBDVD: VIDEO_FAST_FORWARD");
 							}
+							if (ddvd_trickmode & (SLOWFW|SLOWBW)) {
+								Debug(3, "DDVD_KEY_PLAY reset slow motion\n");
+								if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
+									perror("LIBDVD: VIDEO_SLOWMOTION");
+							}
 							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 									perror("LIBDVD: AUDIO_SET_MUTE");
-							if (ddvd_playmode & PLAY || ddvd_trickmode & FASTFW) {
+							if (ddvd_playmode & PLAY || ddvd_trickmode & (FASTFW|FASTBW|SLOWFW|SLOWBW)) {
+								Debug(3, "DDVD_KEY_PLAY cont audio and video\n");
 								if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
 									perror("LIBDVD: AUDIO_CONTINUE");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
@@ -2453,6 +2464,33 @@ key_play:
 						finished = 1;
 						break;
 					}
+					case DDVD_KEY_SLOWFWD:
+					case DDVD_KEY_SLOWBWD:
+						ddvd_readpipe(key_pipe, &ddvd_trickspeed, sizeof(int), 1);
+						if (ddvd_trickspeed <= 0) // no slow backward yet
+							goto key_play;
+						if (!(ddvd_trickmode & SLOWFW)) {
+							if (ddvd_trickmode & (FASTFW|FASTBW)) {
+								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
+									perror("LIBDVD: VIDEO_FAST_FORWARD");
+							}
+							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
+								perror("LIBDVD: AUDIO_SET_MUTE");
+							ddvd_trickmode = SLOWFW;
+						}
+						if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, ddvd_trickspeed) < 0)
+							Debug(1, "VIDEO_SLOWMOTION(%d) failed\n", ddvd_trickspeed);
+						if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
+							perror("LIBDVD: VIDEO_CONTINUE");
+						if (ddvd_playmode == PAUSE) {
+							ddvd_playmode = PLAY;
+							ddvd_wait_for_user = 0;
+							if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
+								perror("LIBDVD: AUDIO_CONTINUE");
+						}
+						Debug(3, "SLOW%cWD speed %dx\n", ddvd_trickmode & SLOWFW ? 'F' : 'B', ddvd_trickspeed);
+						msg = ddvd_trickmode & (SLOWFW) ? DDVD_SHOWOSD_STATE_SFWD : DDVD_SHOWOSD_STATE_SBWD;
+						break;
 					case DDVD_KEY_FASTFWD:
 					case DDVD_KEY_FASTBWD:
 						ddvd_readpipe(key_pipe, &ddvd_trickspeed, sizeof(int), 1);
