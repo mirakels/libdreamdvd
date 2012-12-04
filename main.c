@@ -2379,6 +2379,16 @@ send_message:
 								perror("LIBDVD: AUDIO_PAUSE");
 							if (ioctl(ddvd_fdvideo, VIDEO_FREEZE) < 0)
 								perror("LIBDVD: VIDEO_FREEZE");
+							if (ddvd_trickmode != TOFF) {
+								if (ddvd_trickmode & (FASTFW|FASTBW))
+									if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
+										perror("LIBDVD: VIDEO_FAST_FORWARD");
+								if (!ismute)
+									if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
+										perror("LIBDVD: AUDIO_SET_MUTE");
+								ddvd_trickmode = TOFF;
+							}
+
 							msg = DDVD_SHOWOSD_STATE_PAUSE;
 							safe_write(message_pipe, &msg, sizeof(int));
 							ddvd_wait_for_user = 1; // don't waste cpu during pause
