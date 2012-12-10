@@ -227,6 +227,8 @@ enum { // state
 	DDVD_SIZE_CHANGED,
 	DDVD_PROGRESSIVE_CHANGED,
 	DDVD_FRAMERATE_CHANGED,
+	DDVD_SHOWOSD_STATE_SFWD,	// we should display SFWD/SBWD trickmode on osd you can grab the actual time with ddvd_get_last_time
+	DDVD_SHOWOSD_STATE_SBWD,	// and the trickspeed with ddvd_get_last_trickspeed
 };
 
 
@@ -271,6 +273,10 @@ enum { // send_key
 	DDVD_GET_ANGLE,				// get actual angle info
 	DDVD_SET_AUDIO,				// set given audio track id
 	DDVD_SET_SUBTITLE,			// set given subtitle track id
+	DDVD_KEY_SLOWFWD,                       // start or speed up slow forward mode
+	DDVD_KEY_SLOWBWD,                       // start or speed up slow backward mode
+	DDVD_KEY_FASTFWD,                       // start or speed up fast forward mode
+	DDVD_KEY_FASTBWD,                       // start or speed up fast backward mode
 };
 
 // if you use the same keys for different functions in different contexts (menu/movie) just send both commands, the player will 
