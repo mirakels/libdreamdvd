@@ -966,7 +966,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int in_menu = 0;
 	pci_t *pci = NULL;
 	dvdnav_still_event_t still_event;
-	int have_still_event;
+	int have_still_event = 0;
 
 	while (!finished) {
 		dsi_t *dsi = 0;
