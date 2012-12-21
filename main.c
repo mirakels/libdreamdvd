@@ -1690,12 +1690,19 @@ send_message:
 							playerconfig->spu_map[i].stream_id = stream_spu;
 							int lang = dvdnav_spu_stream_to_lang(dvdnav, logical_spu);
 							playerconfig->spu_map[i].lang = lang;
-							if (spu_index == -1 && (lang >> 8) == playerconfig->language[0] && (lang & 0xff) == playerconfig->language[1])
+#if FORCE_DEFAULT_SPULANG
+							if (spu_index == -1 && (lang >> 8) == playerconfig->language[0] && (lang & 0xff) == playerconfig->language[1]) {
 								spu_index = i;
-								Debug(2, "    %d: MPEG spu stream %d -> logical stream %d - %04X %c%c\n", i, stream_spu, logical_spu, lang,
-													lang == 0xFFFF ? 'N' : lang >> 8,
-													lang == 0xFFFF ? 'A' : lang & 0xFF);
-								i++;
+								msg = DDVD_SHOWOSD_SUBTITLE;
+								safe_write(message_pipe, &msg, sizeof(int));
+								safe_write(message_pipe, &spu_index, sizeof(int));
+								safe_write(message_pipe, &lang, sizeof(uint16_t));
+							}
+#endif
+							Debug(2, "    %d: MPEG spu stream %d -> logical stream %d - %04X %c%c\n", i, stream_spu, logical_spu, lang,
+												lang == 0xFFFF ? 'N' : lang >> 8,
+												lang == 0xFFFF ? 'A' : lang & 0xFF);
+							i++;
 						}
 					}
 					if (spu_index != -1) {
