@@ -1030,6 +1030,7 @@ send_message:
 						info = ddvd_get_osd_time(playerconfig);
 						safe_write(message_pipe, &msg, sizeof(int));
 						safe_write(message_pipe, &info, sizeof(struct ddvd_time));
+						Debug(4, "OSD_TIME vpts=%llu pts=%llu iframesend=%d\n", vpts, pts, ddvd_iframesend);
 						break;
 					case DDVD_SHOWOSD_STATE_FFWD:
 						info = ddvd_get_osd_time(playerconfig);
