@@ -1097,6 +1097,7 @@ send_message:
 						safe_write(ddvd_output_fd, last_iframe, ddvd_last_iframe_len);
 #else
 					safe_write(ddvd_output_fd, last_iframe, ddvd_last_iframe_len);
+					safe_write(ddvd_output_fd, last_iframe, ddvd_last_iframe_len); // send twice to avoid no-display...
 #endif
 					//Debug(1, "Show iframe with size: %d\n",ddvd_last_iframe_len);
 					ddvd_last_iframe_len = 0;
