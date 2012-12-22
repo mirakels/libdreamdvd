@@ -1920,7 +1920,7 @@ send_message:
 			ddvd_wait_for_user = 1; // don't waste cpu during pause
 		}
 
-		if (have_still_event && ddvd_iframesend <= 0 && abs(vpts - pts) < 10) {
+		if (have_still_event && ddvd_iframesend <= 0 && pts <= vpts + 3600) {
 			/* It seems stills have a separate vpts (e.g. starting from 0 again, or a separate PGC)
 			 * Reached the time for a still frame. Start a timer to wait the amount of time specified by the
 			 * still's length while still handling user input to make menus and other interactive stills work.
