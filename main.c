@@ -944,7 +944,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		if (sl[len - 4] == '.' && sl[len - 3] == 'i' && sl[len - 2] == 's' && sl[len - 1] == '0')
 			sl[len - 4] = '\0';
 	}
-	Debug(1, "DVD Title: %s\n", playerconfig->title_string);
+	Debug(1, "DVD Title: %s  (DVD says: %s)\n", playerconfig->title_string, dvd_titlestring);
 
 	msg = DDVD_SHOWOSD_TITLESTRING;
 	safe_write(message_pipe, &msg, sizeof(int));
@@ -988,7 +988,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 				int64_t offset;
 				int64_t offset = (ddvd_trickspeed - 1) * 90000L * (ddvd_trickmode & TRICKBW ? BACKWARD_WAIT : FORWARD_WAIT) / 1000;
 				int64_t newpos = (int64_t)pos +(offset + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
-				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - SPU clr=%d->%d vpts=%llu pts=%llu\n", now, pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
+				Debug(1, "FAST FW/BW: %d -> %lld - %lld - SPU clr=%d->%d vpts=%llu pts=%llu\n", pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
 				if (newpos <= 0) {	// reached begin of movie
 					newpos = 0;
 					reached_sof = 1;
