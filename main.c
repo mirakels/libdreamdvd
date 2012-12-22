@@ -986,10 +986,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 				#define FORWARD_WAIT 300
 				#define BACKWARD_WAIT 500
 				int64_t offset;
-				if (ddvd_trickmode & TRICKBW)
-					offset = -(ddvd_trickspeed + 1) * 90000L * BACKWARD_WAIT/1000;
-				else
-					offset = (ddvd_trickspeed - 1) * 90000L * FORWARD_WAIT/1000;
+				int64_t offset = (ddvd_trickspeed - 1) * 90000L * (ddvd_trickmode & TRICKBW ? BACKWARD_WAIT : FORWARD_WAIT) / 1000;
 				int64_t newpos = (int64_t)pos +(offset + (int64_t)(vpts > pts ? pts - vpts : 0)) * (int64_t)len / ddvd_lastCellEventInfo.pgc_length;
 				Debug(1, "%7lld FAST FW/BW: %d -> %lld - %lld - SPU clr=%d->%d vpts=%llu pts=%llu\n", now, pos, newpos, offset, ddvd_spu_play, ddvd_spu_ind, vpts, pts);
 				if (newpos <= 0) {	// reached begin of movie
