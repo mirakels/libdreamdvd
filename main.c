@@ -2403,6 +2403,7 @@ send_message:
 									if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
 										perror("LIBDVD: AUDIO_SET_MUTE");
 								ddvd_trickmode = TOFF;
+								ddvd_trickspeed = 0;
 							}
 
 							msg = DDVD_SHOWOSD_STATE_PAUSE;
@@ -2448,6 +2449,7 @@ key_play:
 								safe_write(message_pipe, &msg, sizeof(int));
 							}
 							ddvd_trickmode = TOFF;
+							ddvd_trickspeed = 0;
 							msg = DDVD_SHOWOSD_TIME;
 						}
 						break;
