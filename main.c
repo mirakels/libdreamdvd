@@ -414,6 +414,7 @@ void ddvd_get_last_audio(struct ddvd *pconfig, void *id, void *lang, void *type)
 	memcpy(id, &pconfig->last_audio_id, sizeof(pconfig->last_audio_id));
 	memcpy(lang, &pconfig->last_audio_lang, sizeof(pconfig->last_audio_lang));
 	memcpy(type, &pconfig->last_audio_type, sizeof(pconfig->last_audio_type));
+	Debug(2, "ddvd_get_last_audio id=%d\n", * (int *)id);
 }
 
 // get audio track details for given audio track id
@@ -435,6 +436,7 @@ void ddvd_get_last_spu(struct ddvd *pconfig, void *id, void *lang)
 {
 	memcpy(id, &pconfig->last_spu_id, sizeof(pconfig->last_spu_id));
 	memcpy(lang, &pconfig->last_spu_lang, sizeof(pconfig->last_spu_lang));
+	Debug(2, "ddvd_get_last_spu id=%d\n", * (int *)id);
 }
 
 // get the number of available subtitle tracks
@@ -1641,6 +1643,7 @@ send_message:
 				safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 				Debug(3, "SPU Stream change: w %d l: %d p: %d log: %d spu %d: active=%d prevactive=%d spu_lang=%04X %c%c\n", ev->physical_wide, ev->physical_letterbox, ev->physical_pan_scan, ev->logical, spu_index, spu_active_id, old_active_id, spu_lang, spu_lang >> 8, spu_lang & 0xFF);
 				spu_active_id &= 0x1F;
+				playerconfig->last_spu_id = spu_index;
 				break;
 
 			case DVDNAV_AUDIO_STREAM_CHANGE:
@@ -1707,6 +1710,7 @@ send_message:
 						spu_lock = 1;
 						Debug(3, "    Try setting SPU to %s -> spu_active=%d\n", playerconfig->language, spu_active_id);
 					}
+					playerconfig->last_spu_id = spu_index;
 
 					dvd_aspect = dvdnav_get_video_aspect(dvdnav);
 					dvd_scale_perm = dvdnav_get_video_scale_permission(dvdnav);
@@ -1781,6 +1785,7 @@ send_message:
 								spu_active_id = -1;
 								spu_index = -1;
 							}
+							playerconfig->last_spu_id = spu_index;
 							msg = DDVD_SHOWOSD_SUBTITLE;
 							safe_write(message_pipe, &msg, sizeof(int));
 							safe_write(message_pipe, &spu_index, sizeof(int));
@@ -2645,6 +2650,7 @@ key_play:
 						}
 						Debug(1, "DDVD_SET_SUBTITLE CURRENT ind=%d act=%d prevact=%d - %c%c\n", spu_index, spu_active_id, old_active_id, spu_lang >> 8, spu_lang & 0xFF);
 						spu_lock = 1;
+						playerconfig->last_spu_id = spu_index;
 						msg = DDVD_SHOWOSD_SUBTITLE;
 						safe_write(message_pipe, &msg, sizeof(int));
 						safe_write(message_pipe, &spu_index, sizeof(int));
