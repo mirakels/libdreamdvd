@@ -2600,7 +2600,7 @@ key_play:
 								reached_sof = 1;
 							}
 							dvdnav_sector_search(dvdnav, newpos, SEEK_SET);
-							ddvd_lpcm_count = 0;
+							ddvd_play_empty(1);
 							msg = DDVD_SHOWOSD_TIME;
 							Debug(1, "                 clr spu frame spu_nr=%d->%d\n", ddvd_spu_play, ddvd_spu_ind);
 							ddvd_spu_play = ddvd_spu_ind; // skip remaining subtitles
