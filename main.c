@@ -3,6 +3,7 @@
  *
  * DreamDVD V0.9 - DVD-Player for Dreambox
  * Copyright (C) 2007 by Seddi
+ * Updates 2012-2013 Mirakels
  *
  * This DVD Player is based upon the great work from the libdvdnav project,
  * a52dec library, ffmpeg and the knowledge from all the people who made
@@ -28,8 +29,11 @@
 #include "main.h"
 #include "mpegaudioenc.h"
 #include "a52dec.h"
+#include "string.h"
+#include "errno.h"
 
 #define Debug(level, str, ...) (DebugLevel > level ? printf("LIBDVD: %07.3f: " str, (float) ddvd_get_time() / 1000.0, ##__VA_ARGS__) : 0)
+#define Perror(msg)            Debug(-1, "%s: %s", msg, strerror(errno))
 
 int DebugLevel = 1;
 
@@ -46,7 +50,7 @@ static ssize_t safe_write(int fd, const void *buf, size_t count)
 		n = write(fd, &ptr[written], count - written);
 		if (n < 0) {
 			if (errno != EINTR) {
-				perror("LIBDVD: write");
+				Perror("write");
 				return written ? written : -1;
 			}
 		}
@@ -64,7 +68,7 @@ static void write_string(const char *filename, const char *string)
 
 	f = fopen(filename, "w");
 	if (f == NULL) {
-		perror(filename);
+		Perror(filename);
 		return;
 	}
 
@@ -80,17 +84,17 @@ static int open_pipe(int fd[2])
 	fd[0] = fd[1] = -1;
 
 	if (pipe(fd) < 0) {
-		perror("LIBDVD: pipe");
+		Perror("pipe");
 		goto err;
 	}
 
 	flags = fcntl(fd[0], F_GETFL);
 	if (flags < 0) {
-		perror("LIBDVD: F_GETFL");
+		Perror("F_GETFL");
 		goto err;
 	}
 	if (fcntl(fd[0], F_SETFL, flags | O_NONBLOCK) < 0) {
-		perror("LIBDVD: F_SETFL");
+		Perror("F_SETFL");
 		goto err;
 	}
 
@@ -120,7 +124,7 @@ struct ddvd *ddvd_create(void)
 
 	pconfig = malloc(sizeof(struct ddvd));
 	if (pconfig == NULL) {
-		perror("LIBDVD: malloc pconfig");
+		Perror("malloc pconfig");
 		return NULL;
 	}
 
@@ -627,14 +631,14 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	// init backbuffer (SPU)
 	ddvd_lbb = malloc(720 * 576);	// the spu backbuffer is always max DVD PAL 720x576 pixel (NTSC 720x480)
 	if (ddvd_lbb == NULL) {
-		perror("LIBDVD: SPU decode buffer <mem allocation failed>");
+		Perror("SPU decode buffer <mem allocation failed>");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
 
 	ddvd_lbb2 = malloc(ddvd_screeninfo_xres * ddvd_screeninfo_yres * ddvd_screeninfo_bypp);
 	if (ddvd_lbb2 == NULL) {
-		perror("LIBDVD: SPU to screen buffer <mem allocation failed>");
+		Perror("SPU to screen buffer <mem allocation failed>");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
@@ -647,13 +651,13 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		for (i = 0; i < NUM_SPU_BACKBUFFER; i++)  {
 			ddvd_spu[i] = malloc(SPU_BUFLEN);    // buffers for decoded SPU packets
 			if (ddvd_spu[i] == NULL) {
-				perror("LIBDVD: SPU backbuffer <mem allocation failed>");
+				Perror("SPU backbuffer <mem allocation failed>");
 				res = DDVD_NOMEM;
 				goto err_malloc;
 			}
 			ddvd_pci[i] = malloc(sizeof(pci_t));    // buffers for pci packets
 			if (ddvd_pci[i] == NULL) {
-				perror("LIBDVD: PCI backbuffer <mem allocation failed>");
+				Perror("PCI backbuffer <mem allocation failed>");
 				res = DDVD_NOMEM;
 				goto err_malloc;
 			}
@@ -664,7 +668,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 
 	last_iframe = malloc(320 * 1024);
 	if (last_iframe == NULL) {
-		perror("LIBDVD: malloc last_iframe");
+		Perror("malloc last_iframe");
 		res = DDVD_NOMEM;
 		goto err_malloc;
 	}
@@ -689,76 +693,76 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 #if CONFIG_API_VERSION == 1
 	ddvd_output_fd = open("/dev/video", O_WRONLY);
 	if (ddvd_output_fd == -1) {
-		perror("LIBDVD: /dev/video");
+		Perror("/dev/video");
 		res = DDVD_BUSY;
 		goto err_open_output_fd;
 	}
 
 	ddvd_fdvideo = open("/dev/dvb/card0/video0", O_RDWR);
 	if (ddvd_fdvideo == -1) {
-		perror("LIBDVD: /dev/dvb/card0/video0");
+		Perror("/dev/dvb/card0/video0");
 		res = DDVD_BUSY;
 		goto err_open_fdvideo;
 	}
 
 	ddvd_fdaudio = open("/dev/dvb/card0/audio0", O_RDWR);
 	if (ddvd_fdaudio == -1) {
-		perror("LIBDVD: /dev/dvb/card0/audio0");
+		Perror("/dev/dvb/card0/audio0");
 		res = DDVD_BUSY;
 		goto err_open_fdaudio;
 	}
 
 	ddvd_ac3_fd = open("/dev/sound/dsp1", O_RDWR);
 	if (ddvd_ac3_fd == -1) {
-		perror("LIBDVD: /dev/sound/dsp1");
+		Perror("/dev/sound/dsp1");
 		res = DDVD_BUSY;
 		goto err_open_ac3_fd;
 	}
 
 	if (ioctl(ddvd_fdvideo, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_MEMORY) < 0)
-		perror("LIBDVD: VIDEO_SELECT_SOURCE");
+		Perror("VIDEO_SELECT_SOURCE");
 	if (ioctl(ddvd_fdvideo, VIDEO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: VIDEO_CLEAR_BUFFER");
+		Perror("VIDEO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdvideo, VIDEO_PLAY) < 0)
-		perror("LIBDVD: VIDEO_PLAY");
+		Perror("VIDEO_PLAY");
 
 	if (ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_MEMORY) < 0)
-		perror("LIBDVD: AUDIO_SELECT_SOURCE");
+		Perror("AUDIO_SELECT_SOURCE");
 	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: AUDIO_CLEAR_BUFFER");
+		Perror("AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
-		perror("LIBDVD: AUDIO_PLAY");
+		Perror("AUDIO_PLAY");
 
 #elif CONFIG_API_VERSION == 3
 	ddvd_output_fd = ddvd_fdvideo = open("/dev/dvb/adapter0/video0", O_RDWR);
 	if (ddvd_fdvideo == -1) {
-		perror("LIBDVD: /dev/dvb/adapter0/video0");
+		Perror("/dev/dvb/adapter0/video0");
 		res = DDVD_BUSY;
 		goto err_open_fdvideo;
 	}
 
 	ddvd_ac3_fd = ddvd_fdaudio = open("/dev/dvb/adapter0/audio0", O_RDWR);
 	if (ddvd_fdaudio == -1) {
-		perror("LIBDVD: /dev/dvb/adapter0/audio0");
+		Perror("/dev/dvb/adapter0/audio0");
 		res = DDVD_BUSY;
 		goto err_open_ac3_fd;
 	}
 
 	if (ioctl(ddvd_fdvideo, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_MEMORY) < 0)
-		perror("LIBDVD: VIDEO_SELECT_SOURCE");
+		Perror("VIDEO_SELECT_SOURCE");
 	if (ioctl(ddvd_fdvideo, VIDEO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: VIDEO_CLEAR_BUFFER");
+		Perror("VIDEO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdvideo, VIDEO_SET_STREAMTYPE, 0) < 0)	// set mpeg2
-		perror("LIBDVD: VIDEO_SET_STREAMTYPE");
+		Perror("VIDEO_SET_STREAMTYPE");
 	if (ioctl(ddvd_fdvideo, VIDEO_PLAY) < 0)
-		perror("LIBDVD: VIDEO_PLAY");
+		Perror("VIDEO_PLAY");
 
 	if (ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_MEMORY) < 0)
-		perror("LIBDVD: AUDIO_SELECT_SOURCE");
+		Perror("AUDIO_SELECT_SOURCE");
 	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: AUDIO_CLEAR_BUFFER");
+		Perror("AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
-		perror("LIBDVD: AUDIO_PLAY");
+		Perror("AUDIO_PLAY");
 #else
 # error please define CONFIG_API_VERSION to be 1 or 3
 #endif
@@ -831,7 +835,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int ismute = 0;
 
 	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-		perror("LIBDVD: AUDIO_SET_AV_SYNC");
+		Perror("AUDIO_SET_AV_SYNC");
 #if CONFIG_API_VERSION == 1
 	// set video system
 	int pal_ntsc = playerconfig->tv_system;
@@ -843,7 +847,7 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int saafd = open("/dev/dbox/saa0", O_RDWR);
 	if (saafd >= 0) {
 		if (ioctl(saafd, SAAIOSENC, &saa) < 0)
-			perror("LIBDVD: SAAIOSENC");
+			Perror("SAAIOSENC");
 		close(saafd);
 	}
 #else
@@ -1263,9 +1267,9 @@ send_message:
 						if (audio_type != DDVD_MPEG) {
 							//Debug(1, "Switch to MPEG Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_AV_SYNC");
+								Perror("AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
+								Perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_MPEG;
 						}
 
@@ -1293,9 +1297,9 @@ send_message:
 						if (audio_type != DDVD_LPCM) {
 							//Debug(1, "Switch to LPCM Audio\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_AV_SYNC");
+								Perror("AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, lpcm_mode) < 0)
-								perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
+								Perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_LPCM;
 							ddvd_lpcm_count = 0;
 						}
@@ -1361,13 +1365,13 @@ send_message:
 						if (audio_type != DDVD_DTS) {
 							//Debug(1, "Switch to DTS Audio (thru)\n");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_AV_SYNC");
+								Perror("AUDIO_SET_AV_SYNC");
 #ifdef CONVERT_TO_DVB_COMPLIANT_DTS
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 2) < 0)	// DTS (dvb compliant)
 #else
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, 5) < 0)	// DTS VOB
 #endif
-								perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
+								Perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_DTS;
 						}
 
@@ -1406,9 +1410,9 @@ send_message:
 							else
 								bypassmode = 1;
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_AV_SYNC");
+								Perror("AUDIO_SET_AV_SYNC");
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_BYPASS_MODE, bypassmode) < 0)
-									perror("LIBDVD: AUDIO_SET_BYPASS_MODE");
+									Perror("AUDIO_SET_BYPASS_MODE");
 							audio_type = DDVD_AC3;
 						}
 
@@ -1858,7 +1862,7 @@ send_message:
 #if CONFIG_API_VERSION == 1
 		unsigned int tpts;
 		if (ioctl(ddvd_output_fd, VIDEO_GET_PTS, &tpts) < 0)
-			perror("LIBDVD: VIDEO_GET_PTS");
+			Perror("VIDEO_GET_PTS");
 		pts = (unsigned long long)tpts;
 		// we only have a 32bit pts on vulcan/pallas (instead of 33bit) so we need some
 		// tolerance on syncing SPU for menus so on non animated menus the buttons will
@@ -1903,15 +1907,15 @@ send_message:
 			}
 		}
 		if (ioctl(ddvd_fdvideo, VIDEO_GET_PTS, &pts) < 0)
-			perror("LIBDVD: VIDEO_GET_PTS");
+			Perror("VIDEO_GET_PTS");
 		// pts+10 to avoid decoder time rounding errors. Seen vpts=11555 and pts=11554 ...
 		signed long long spudiff = pts+10 - spupts;
 #endif
 		if (ddvd_playmode & STEP && pts > steppts) { // finish step
 			if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
-				perror("LIBDVD: AUDIO_PAUSE");
+				Perror("AUDIO_PAUSE");
 			if (ioctl(ddvd_fdvideo, VIDEO_FREEZE) < 0)
-				perror("LIBDVD: VIDEO_FREEZE");
+				Perror("VIDEO_FREEZE");
 			Debug(3, "STEP mode done: go to PAUSE on %lld now %lld diff %lld %d:%02d:%02d/%02d\n", steppts, pts, pts - steppts,
 					(int)(pts/90000/3600), (int)(pts/90000/60)%60, (int)(pts/90000)%60,
 					(int)((pts%90000 + 1) * playerconfig->last_framerate.framerate / 90000 / 1000));
@@ -2265,9 +2269,9 @@ send_message:
 						ddvd_playmode = STEP;
 						keydone = 1;
 						if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
-							perror("LIBDVD: AUDIO_CONTINUE");
+							Perror("AUDIO_CONTINUE");
 						if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-							perror("LIBDVD: VIDEO_CONTINUE");
+							Perror("VIDEO_CONTINUE");
 						break;
 					case DDVD_KEY_FASTFWD:
 					case DDVD_KEY_FASTBWD:
@@ -2391,19 +2395,19 @@ send_message:
 						if (ddvd_playmode == PLAY) { // no bitfield check, need real pause here
 							ddvd_playmode = PAUSE;
 							if (ioctl(ddvd_fdaudio, AUDIO_PAUSE) < 0)
-								perror("LIBDVD: AUDIO_PAUSE");
+								Perror("AUDIO_PAUSE");
 							if (ioctl(ddvd_fdvideo, VIDEO_FREEZE) < 0)
-								perror("LIBDVD: VIDEO_FREEZE");
+								Perror("VIDEO_FREEZE");
 							if (ddvd_trickmode != TOFF) {
 								if (ddvd_trickmode & (FASTFW|FASTBW))
 									if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
-										perror("LIBDVD: VIDEO_FAST_FORWARD");
+										Perror("VIDEO_FAST_FORWARD");
 								if (ddvd_trickmode & (SLOWFW|SLOWBW))
 									if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
-										perror("LIBDVD: VIDEO_SLOWMOTION");
+										Perror("VIDEO_SLOWMOTION");
 								if (!ismute)
 									if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
-										perror("LIBDVD: AUDIO_SET_MUTE");
+										Perror("AUDIO_SET_MUTE");
 								ddvd_trickmode = TOFF;
 								ddvd_trickspeed = 0;
 							}
@@ -2431,22 +2435,22 @@ key_play:
 							if (ddvd_trickmode & (FASTFW|FASTBW)) {
 								Debug(3, "DDVD_KEY_PLAY reset fast forward\n");
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
-									perror("LIBDVD: VIDEO_FAST_FORWARD");
+									Perror("VIDEO_FAST_FORWARD");
 							}
 							if (ddvd_trickmode & (SLOWFW|SLOWBW)) {
 								Debug(3, "DDVD_KEY_PLAY reset slow motion\n");
 								if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
-									perror("LIBDVD: VIDEO_SLOWMOTION");
+									Perror("VIDEO_SLOWMOTION");
 							}
 							if (ddvd_trickmode != TOFF && !ismute)
 								if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 0) < 0)
-									perror("LIBDVD: AUDIO_SET_MUTE");
+									Perror("AUDIO_SET_MUTE");
 							if (ddvd_playmode & PLAY || ddvd_trickmode & (FASTFW|FASTBW|SLOWFW|SLOWBW)) {
 								Debug(3, "DDVD_KEY_PLAY cont audio and video\n");
 								if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
-									perror("LIBDVD: AUDIO_CONTINUE");
+									Perror("AUDIO_CONTINUE");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-									perror("LIBDVD: VIDEO_CONTINUE");
+									Perror("VIDEO_CONTINUE");
 								msg = DDVD_SHOWOSD_STATE_PLAY;
 								safe_write(message_pipe, &msg, sizeof(int));
 							}
@@ -2485,21 +2489,21 @@ key_play:
 						if (!(ddvd_trickmode & SLOWFW)) {
 							if (ddvd_trickmode & (FASTFW|FASTBW)) {
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0))
-									perror("LIBDVD: VIDEO_FAST_FORWARD");
+									Perror("VIDEO_FAST_FORWARD");
 							}
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_MUTE");
+								Perror("AUDIO_SET_MUTE");
 							ddvd_trickmode = SLOWFW;
 						}
 						if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, ddvd_trickspeed) < 0)
 							Debug(1, "VIDEO_SLOWMOTION(%d) failed\n", ddvd_trickspeed);
 						if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-							perror("LIBDVD: VIDEO_CONTINUE");
+							Perror("VIDEO_CONTINUE");
 						if (ddvd_playmode == PAUSE) {
 							ddvd_playmode = PLAY;
 							ddvd_wait_for_user = 0;
 							if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
-								perror("LIBDVD: AUDIO_CONTINUE");
+								Perror("AUDIO_CONTINUE");
 						}
 						Debug(3, "SLOW%cWD speed %dx\n", ddvd_trickmode & SLOWFW ? 'F' : 'B', ddvd_trickspeed);
 						msg = ddvd_trickmode & (SLOWFW) ? DDVD_SHOWOSD_STATE_SFWD : DDVD_SHOWOSD_STATE_SBWD;
@@ -2513,25 +2517,25 @@ key_play:
 						if (!(ddvd_trickmode & (FASTFW|FASTBW|TRICKFW|TRICKBW))) {
 							if (ddvd_trickmode & (SLOWFW|SLOWBW)) {
 								if (ioctl(ddvd_fdvideo, VIDEO_SLOWMOTION, 0) < 0)
-									perror("LIBDVD: VIDEO_SLOWMOTION");
+									Perror("VIDEO_SLOWMOTION");
 							}
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_MUTE");
+								Perror("AUDIO_SET_MUTE");
 						}
 						// determine if flip to/from driver (smooth) or trick fast forward
 						if (ddvd_trickspeed > 0 && ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
 							ddvd_trickmode = FASTFW;
 							if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, ddvd_trickspeed) < 0)
-								perror("LIBDVD: VIDEO_FAST_FORWARD");
+								Perror("VIDEO_FAST_FORWARD");
 							if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-								perror("LIBDVD: VIDEO_CONTINUE");
+								Perror("VIDEO_CONTINUE");
 						}
 						else {
 							if (ddvd_trickmode & FASTFW) {
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0) < 0)
-									perror("LIBDVD: VIDEO_FAST_FORWARD");
+									Perror("VIDEO_FAST_FORWARD");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-									perror("LIBDVD: VIDEO_CONTINUE");
+									Perror("VIDEO_CONTINUE");
 							}
 							ddvd_trickmode = (ddvd_trickspeed < 0 ? TRICKBW : TRICKFW);
 						}
@@ -2543,7 +2547,7 @@ key_play:
 					{
 						if (ddvd_trickmode == TOFF) {
 							if (ioctl(ddvd_fdaudio, AUDIO_SET_MUTE, 1) < 0)
-								perror("LIBDVD: AUDIO_SET_MUTE");
+								Perror("AUDIO_SET_MUTE");
 							ddvd_trickspeed = 2;
 							ddvd_trickmode = (rccode == DDVD_KEY_FBWD ? TRICKBW : FASTFW);
 						}
@@ -2562,16 +2566,16 @@ key_play:
 							if (ddvd_trickspeed < 7) { // higher speeds cannot be handled reliably by driver
 								ddvd_trickmode = FASTFW; // Driver fast forward
 								if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, ddvd_trickspeed) < 0)
-									perror("LIBDVD: VIDEO_FAST_FORWARD");
+									Perror("VIDEO_FAST_FORWARD");
 								if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-									perror("LIBDVD: VIDEO_CONTINUE");
+									Perror("VIDEO_CONTINUE");
 							}
 							else {
 								if (ddvd_trickmode & FASTFW) {
 									if (ioctl(ddvd_fdvideo, VIDEO_FAST_FORWARD, 0) < 0)
-										perror("LIBDVD: VIDEO_FAST_FORWARD");
+										Perror("VIDEO_FAST_FORWARD");
 									if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-										perror("LIBDVD: VIDEO_CONTINUE");
+										Perror("VIDEO_CONTINUE");
 								}
 								ddvd_trickmode = TRICKFW; // Trick fast forward
 							}
@@ -2698,9 +2702,9 @@ err_dvdnav:
 err_dvdnav_open:
 	ddvd_device_clear();
 	if (ioctl(ddvd_fdvideo, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_DEMUX) < 0)
-		perror("LIBDVD: VIDEO_SELECT_SOURCE");
+		Perror("VIDEO_SELECT_SOURCE");
 	if (ioctl(ddvd_fdaudio, AUDIO_SELECT_SOURCE, AUDIO_SOURCE_DEMUX) < 0)
-		perror("LIBDVD: AUDIO_SELECT_SOURCE");
+		Perror("AUDIO_SELECT_SOURCE");
 	close(ddvd_ac3_fd);
 err_open_ac3_fd:
 	close(ddvd_fdaudio);
@@ -2877,21 +2881,21 @@ static void ddvd_device_clear(void)
 	Debug(3, "device_clear: clear audio and video buffers\n");
 
 	if (ioctl(ddvd_fdaudio, AUDIO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: AUDIO_CLEAR_BUFFER");
+		Perror("AUDIO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdaudio, AUDIO_PLAY) < 0)
-		perror("LIBDVD: AUDIO_PLAY");
+		Perror("AUDIO_PLAY");
 	if (ioctl(ddvd_fdaudio, AUDIO_CONTINUE) < 0)
-		perror("LIBDVD: AUDIO_CONTINUE");
+		Perror("AUDIO_CONTINUE");
 
 	if (ioctl(ddvd_fdvideo, VIDEO_CLEAR_BUFFER) < 0)
-		perror("LIBDVD: VIDEO_CLEAR_BUFFER");
+		Perror("VIDEO_CLEAR_BUFFER");
 	if (ioctl(ddvd_fdvideo, VIDEO_PLAY) < 0)
-		perror("LIBDVD: VIDEO_PLAY");
+		Perror("VIDEO_PLAY");
 	if (ioctl(ddvd_fdvideo, VIDEO_CONTINUE) < 0)
-		perror("LIBDVD: VIDEO_CONTINUE");
+		Perror("VIDEO_CONTINUE");
 
 	if (ioctl(ddvd_fdaudio, AUDIO_SET_AV_SYNC, 1) < 0)
-		perror("LIBDVD: AUDIO_SET_AV_SYNC");
+		Perror("AUDIO_SET_AV_SYNC");
 }
 
 // SPU Decoder
