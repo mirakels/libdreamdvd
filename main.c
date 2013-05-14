@@ -1622,7 +1622,7 @@ send_message:
 						break;
 				}
 				uint16_t spu_lang = 0xFFFF;
-				for (spu_index = 0; i < MAX_SPU; spu_index++) {
+				for (spu_index = 0; spu_index < MAX_SPU; spu_index++) {
 					if (playerconfig->spu_map[spu_index].logical_id == -1) // gone past last valid spu entry
 						break;
 					if (playerconfig->spu_map[spu_index].stream_id == spu_active_id & 0x1F) {
