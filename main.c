@@ -1726,8 +1726,8 @@ send_message:
 						int title_numbers, part_numbers;
 						dvdnav_get_number_of_titles(dvdnav, &title_numbers);
 						dvdnav_get_number_of_parts(dvdnav, playerconfig->resume_title, &part_numbers);
-						if (playerconfig->resume_title <= title_numbers && playerconfig->resume_title > 0 &&
-							playerconfig->resume_chapter <= part_numbers && playerconfig->resume_chapter > 0) {
+						if (playerconfig->resume_title   > 0 && playerconfig->resume_title   <= title_numbers &&
+							playerconfig->resume_chapter > 0 && playerconfig->resume_chapter <= part_numbers) {
 							dvdnav_part_play(dvdnav, playerconfig->resume_title, playerconfig->resume_chapter);
 							next_cell_change = 1;
 						}
@@ -1740,7 +1740,8 @@ send_message:
 							playerconfig->resume_audio_lock = 0;
 							playerconfig->resume_spu_id = 0;
 							playerconfig->resume_spu_lock = 0;
-							perror("LIBDVD: resuming failed");
+							Debug(2, "    resume failed on first_vts_change: chapter/title (%d/%d) out of bounds\n",
+                                  playerconfig->resume_title, playerconfig->resume_chapter);
 						}
 					}
 				}
@@ -1762,7 +1763,7 @@ send_message:
 						next_cell_change = 0;
 						playerconfig->should_resume = 0;
 						if (dvdnav_sector_search(dvdnav, playerconfig->resume_block, SEEK_SET) != DVDNAV_STATUS_OK)
-							perror("LIBDVD: resuming failed");
+							Debug(2, "    resume failed on next_cell_change: block %d\n", playerconfig->resume_block);
 						else {
 							audio_id = playerconfig->resume_audio_id;
 							audio_lock = 1;//playerconfig->resume_audio_lock;
@@ -2472,7 +2473,7 @@ key_play:
 								playerconfig->resume_spu_lock = spu_lock;
 						}
 						else
-							perror("LIBDVD: error getting resume position");
+							Debug(1, "    failed to get resume position\n");
 						finished = 1;
 						break;
 					}
