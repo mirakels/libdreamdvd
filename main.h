@@ -251,7 +251,7 @@ struct ddvd {
 	int in_menu;
 	int resume_title;				// title, chapter, block for resuming dvd or
 	int resume_chapter;				// getting actual resume position
-	uint32_t resume_block;
+	unsigned long int resume_block;
 	int resume_audio_id;
 	int resume_audio_lock;
 	int resume_spu_id;
