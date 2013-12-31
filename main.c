@@ -181,12 +181,18 @@ int ddvd_get_messagepipe_fd(struct ddvd *pconfig)
 }
 
 // set resume position
+// At this point the ddvd structure might not yet be completely setup
+// Setup 'event' that will be picked up in the main loop.
 void ddvd_set_resume_pos(struct ddvd *pconfig, struct ddvd_resume resume_info)
 {
+    Debug(2, "ddvd_set_resume_pos: title=%d, chapter=%d, block=%lu, audio_id=%d, audio_lock=%d, spu_id=%d, spu_lock=%d\n",
+             resume_info.title, resume_info.chapter, resume_info.block, resume_info.audio_id, resume_info.audio_lock,
+             resume_info.spu_id, resume_info.spu_lock);
+
+	pconfig->should_resume     = 1;
 	pconfig->resume_title      = resume_info.title;
 	pconfig->resume_chapter    = resume_info.chapter;
 	pconfig->resume_block      = resume_info.block;
-	pconfig->should_resume     = 1;
 	pconfig->resume_audio_id   = resume_info.audio_id;
 	pconfig->resume_audio_lock = resume_info.audio_lock;
 	pconfig->resume_spu_id     = resume_info.spu_id;
@@ -1724,30 +1730,7 @@ send_message:
 								dvd_aspect, tv_aspect, tv_scale, dvd_scale_perm, tv_mode,
 								playerconfig->language[0], playerconfig->language[1]);
 
-					// resuming a dvd ?
-					if (playerconfig->should_resume && first_vts_change) {
-						first_vts_change = 0;
-						int title_numbers, part_numbers;
-						dvdnav_get_number_of_titles(dvdnav, &title_numbers);
-						dvdnav_get_number_of_parts(dvdnav, playerconfig->resume_title, &part_numbers);
-						if (playerconfig->resume_title   > 0 && playerconfig->resume_title   <= title_numbers &&
-							playerconfig->resume_chapter > 0 && playerconfig->resume_chapter <= part_numbers) {
-							dvdnav_part_play(dvdnav, playerconfig->resume_title, playerconfig->resume_chapter);
-							next_cell_change = 1;
-						}
-						else {
-							playerconfig->should_resume = 0;
-							playerconfig->resume_title = 0;
-							playerconfig->resume_chapter = 0;
-							playerconfig->resume_block = 0;
-							playerconfig->resume_audio_id = 0;
-							playerconfig->resume_audio_lock = 0;
-							playerconfig->resume_spu_id = 0;
-							playerconfig->resume_spu_lock = 0;
-							Debug(2, "    resume failed on first_vts_change: chapter/title (%d/%d) out of bounds\n",
-                                  playerconfig->resume_title, playerconfig->resume_chapter);
-						}
-					}
+					first_vts_change = 0; // After the first VTS resuming can commence
 				}
 				break;
 
@@ -1764,11 +1747,8 @@ send_message:
 
 					// resuming a dvd ?
 					if (playerconfig->should_resume && next_cell_change) {
-						next_cell_change = 0;
-						playerconfig->should_resume = 0;
-						if (dvdnav_sector_search(dvdnav, playerconfig->resume_block, SEEK_SET) != DVDNAV_STATUS_OK)
-							Debug(2, "    resume failed on next_cell_change: block %d\n", playerconfig->resume_block);
-						else {
+						if (dvdnav_sector_search(dvdnav, playerconfig->resume_block, SEEK_SET) == DVDNAV_STATUS_OK) {
+							Debug(3, "    resuming to block %d\n", playerconfig->resume_block);
 							audio_id = playerconfig->resume_audio_id;
 							audio_lock = 1;//playerconfig->resume_audio_lock;
 							spu_active_id = playerconfig->resume_spu_id;
@@ -1798,6 +1778,12 @@ send_message:
 							safe_write(message_pipe, &spu_lang, sizeof(uint16_t));
 							msg = DDVD_SHOWOSD_TIME; // send new position to the frontend
 						}
+						else
+							Debug(2, "    resume failed: cannot find/seek to block %d\n", playerconfig->resume_block);
+
+						// avoid subsequent resumes
+						next_cell_change = 0;
+						playerconfig->should_resume = 0;
 						playerconfig->resume_title = 0;
 						playerconfig->resume_chapter = 0;
 						playerconfig->resume_block = 0;
@@ -1840,6 +1826,7 @@ send_message:
 			case DVDNAV_STOP:
 				/* Playback should end here. */
 				Debug(2, "DVDNAV_STOP\n");
+				playerconfig->should_resume = 0;
 				playerconfig->resume_title = 0;
 				playerconfig->resume_chapter = 0;
 				playerconfig->resume_block = 0;
@@ -1854,6 +1841,32 @@ send_message:
 				Debug(1, "DVDNAV_Unknown event (%i)\n", event);
 				finished = 1;
 				break;
+			}
+		}
+
+		// resuming a dvd ?
+		if (playerconfig->should_resume && !first_vts_change && !next_cell_change) {
+			int title_numbers, part_numbers;
+			dvdnav_get_number_of_titles(dvdnav, &title_numbers);
+			dvdnav_get_number_of_parts(dvdnav, playerconfig->resume_title, &part_numbers);
+			if (playerconfig->resume_title   > 0 && playerconfig->resume_title   <= title_numbers &&
+				playerconfig->resume_chapter > 0 && playerconfig->resume_chapter <= part_numbers) {
+				dvdnav_part_play(dvdnav, playerconfig->resume_title, playerconfig->resume_chapter);
+				next_cell_change = 1;
+				Debug(3, "Resuming after first vts: going to chapter/title (%d/%d)\n",
+                               playerconfig->resume_title, playerconfig->resume_chapter);
+			}
+			else {
+				playerconfig->should_resume = 0;
+				playerconfig->resume_title = 0;
+				playerconfig->resume_chapter = 0;
+				playerconfig->resume_block = 0;
+				playerconfig->resume_audio_id = 0;
+				playerconfig->resume_audio_lock = 0;
+				playerconfig->resume_spu_id = 0;
+				playerconfig->resume_spu_lock = 0;
+				Debug(2, "Resume failed after first vts: chapter/title (%d/%d) out of bounds\n",
+                               playerconfig->resume_title, playerconfig->resume_chapter);
 			}
 		}
 
@@ -2314,6 +2327,7 @@ send_message:
 						break;
 					case DDVD_KEY_EXIT:	//Exit
 						Debug(3, "DDVD_KEY_EXIT (menu)\n");
+						playerconfig->should_resume = 0;
 						playerconfig->resume_title = 0;
 						playerconfig->resume_chapter = 0;
 						playerconfig->resume_block = 0;
