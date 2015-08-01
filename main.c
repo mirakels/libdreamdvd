@@ -121,6 +121,7 @@ err:
 struct ddvd *ddvd_create(void)
 {
 	struct ddvd *pconfig;
+	int i;
 
 	pconfig = malloc(sizeof(struct ddvd));
 	if (pconfig == NULL) {
@@ -129,6 +130,13 @@ struct ddvd *ddvd_create(void)
 	}
 
 	memset(pconfig, 0, sizeof(struct ddvd));
+	for (i = 0; i < MAX_AUDIO; i++)
+		pconfig->audio_format[i] = -1;
+    pconfig->last_audio_id = -1;
+
+	for (i = 0; i < MAX_SPU; i++)
+		pconfig->spu_map[i].logical_id = pconfig->spu_map[i].stream_id = pconfig->spu_map[i].lang = -1;
+    pconfig->last_spu_id = -1;
 
 	// defaults
 	ddvd_set_ac3thru(pconfig, 0);
@@ -624,6 +632,19 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 	int msg;
 	// try to load liba52.so.0 for softdecoding
 	int have_liba52 = ddvd_load_liba52();
+	int audio_lock = 0;
+	int spu_lock = 0;
+
+	unsigned long long vpts = 0, apts = 0, spts = 0, pts = 0;
+	unsigned long long steppts = 0; // target pts for STEP mode
+	ddvd_lbb_changed = 0;
+	ddvd_clear_screen = 0;
+	int have_highlight = 0;
+	int ddvd_wait_highlight = 0;
+	const char *dvd_titlestring = NULL;
+	playerconfig->in_menu = 0;
+	int ddvd_spu_ind = 0;
+	int ddvd_spu_play = 0;
 
 	// decide which resize routine we should use
 	// on 4bpp mode we use bicubic resize for sd skins because we get much better results with subtitles and the speed is ok
@@ -669,8 +690,6 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 			}
 		}
 	}
-	int ddvd_spu_ind = 0;
-	int ddvd_spu_play = 0;
 
 	last_iframe = malloc(320 * 1024);
 	if (last_iframe == NULL) {
@@ -914,33 +933,14 @@ enum ddvd_result ddvd_run(struct ddvd *playerconfig)
 		goto err_dvdnav;
 	}
 
-	int audio_lock = 0;
-	int spu_lock = 0;
-	for (i = 0; i < MAX_AUDIO; i++)
-		playerconfig->audio_format[i] = -1;
-
-	for (i = 0; i < MAX_SPU; i++)
-		playerconfig->spu_map[i].logical_id = playerconfig->spu_map[i].stream_id = playerconfig->spu_map[i].lang = -1;
-
-	unsigned long long vpts = 0, apts = 0, spts = 0, pts = 0;
-	unsigned long long steppts = 0; // target pts for STEP mode
-
 	audio_id = dvdnav_get_active_audio_stream(dvdnav);
 	ddvd_playmode = PLAY;
 
-	ddvd_lbb_changed = 0;
-	ddvd_clear_screen = 0;
-
-	int have_highlight = 0;
-	int ddvd_wait_highlight = 0;
 	dvdnav_highlight_event_t highlight_event;
 
 	ddvd_play_empty(FALSE);
 	ddvd_get_time();	//set timestamp
 
-	playerconfig->in_menu = 0;
-
-	const char *dvd_titlestring = NULL;
 	if (dvdnav_get_title_string(dvdnav, &dvd_titlestring) == DVDNAV_STATUS_OK)
 		strncpy(playerconfig->title_string, dvd_titlestring, 96);
 	if (strlen(playerconfig->title_string) == 0) {
