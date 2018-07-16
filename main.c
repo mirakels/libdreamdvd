@@ -123,6 +123,7 @@ struct ddvd *ddvd_create(void)
 	struct ddvd *pconfig;
 	int i;
 
+	// Debug(2, "ddvd_create: setup dvd config struct\n");
 	pconfig = malloc(sizeof(struct ddvd));
 	if (pconfig == NULL) {
 		Perror("malloc pconfig");
@@ -132,11 +133,11 @@ struct ddvd *ddvd_create(void)
 	memset(pconfig, 0, sizeof(struct ddvd));
 	for (i = 0; i < MAX_AUDIO; i++)
 		pconfig->audio_format[i] = -1;
-    pconfig->last_audio_id = -1;
+	pconfig->last_audio_id = -1;
 
 	for (i = 0; i < MAX_SPU; i++)
 		pconfig->spu_map[i].logical_id = pconfig->spu_map[i].stream_id = pconfig->spu_map[i].lang = -1;
-    pconfig->last_spu_id = -1;
+	pconfig->last_spu_id = -1;
 
 	// defaults
 	ddvd_set_ac3thru(pconfig, 0);
@@ -168,6 +169,7 @@ struct ddvd *ddvd_create(void)
 // destroy ddvd handle
 void ddvd_close(struct ddvd *pconfig)
 {
+	// Debug(2, "ddvd_close: cleanup dvd config struct\n");
 	if (pconfig->message_pipe[0] != -1)
 		close(pconfig->message_pipe[0]);
 	if (pconfig->message_pipe[1] != -1)
@@ -215,11 +217,11 @@ void ddvd_set_lfb(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, 
 
 void ddvd_set_lfb_ex(struct ddvd *pconfig, unsigned char *lfb, int xres, int yres, int bypp, int stride, int canscale)
 {
-	pconfig->lfb = lfb;
-	pconfig->xres = xres;
-	pconfig->yres = yres;
-	pconfig->stride = stride;
-	pconfig->bypp = bypp;
+	pconfig->lfb      = lfb;
+	pconfig->xres     = xres;
+	pconfig->yres     = yres;
+	pconfig->stride   = stride;
+	pconfig->bypp     = bypp;
 	pconfig->canscale = canscale;
 }
 
@@ -248,9 +250,9 @@ void ddvd_set_ac3thru(struct ddvd *pconfig, int ac3thru)
 // set video options
 void ddvd_set_video_ex(struct ddvd *pconfig, int aspect, int tv_mode, int tv_mode2, int tv_system)
 {
-	pconfig->aspect = aspect;
-	pconfig->tv_mode = tv_mode;
-	pconfig->tv_mode2 = tv_mode2;
+	pconfig->aspect    = aspect;
+	pconfig->tv_mode   = tv_mode;
+	pconfig->tv_mode2  = tv_mode2;
 	pconfig->tv_system = tv_system;
 }
 
@@ -283,11 +285,7 @@ void ddvd_send_key(struct ddvd *pconfig, int key)
 // skip n seconds in playing n>0 forward - n<0 backward
 void ddvd_skip_seconds(struct ddvd *pconfig, int seconds)
 {
-	if (seconds < 0)
-		ddvd_send_key(pconfig, DDVD_SKIP_BWD);
-	else
-		ddvd_send_key(pconfig, DDVD_SKIP_FWD);
-
+	ddvd_send_key(pconfig, seconds < 0 ? DDVD_SKIP_BWD : DDVD_SKIP_FWD);
 	ddvd_send_key(pconfig, seconds);
 }
 
@@ -1169,11 +1167,9 @@ send_message:
 						if (dvd_aspect == 3 && (
 							(tv_aspect == DDVD_16_9 && (tv_mode == DDVD_PAN_SCAN || tv_mode == DDVD_LETTERBOX)) ||
 							(tv_aspect == DDVD_16_10 && (tv_mode2 == DDVD_PAN_SCAN || tv_mode2 == DDVD_LETTERBOX)) ) ) {
-							int z = 0;
-							for (z = 0; z < 2040; z++) {
+							for (int z = 0; z < 2040; z++) {
 								if (buf[z] == 0x0 && buf[z + 1] == 0x0 && buf[z + 2] ==0x01 && buf[z + 3] == 0xB5 &&
 									(buf[z + 4] == 0x22 || buf[z + 4] == 0x23) ) {
-									buf[z + 5] = 0x22;
 									buf[z + 5] = 0x0B;
 									buf[z + 6] = 0x42;
 									buf[z + 7] = 0x12;
